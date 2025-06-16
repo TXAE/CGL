@@ -3,4 +3,5 @@ SELECT TOP (1000) [MessageClass]
       ,[ObjectXML]
       ,[LastUpdated]
   FROM [BPS].[dbo].[MessageObjects]
-  where id like '%65296228%'
+  where id like '%943711%'
+  and LastUpdated like '%2025%'
