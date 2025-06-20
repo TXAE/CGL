@@ -1,7 +1,5 @@
-rem Daniel Hermes, 29. April 2025
-rem This script needs you to be in the "SAP Easy Access" menu. 
-rem That is the menu just after login. You need to be logged in, but have no T-Code open.
-rem Script will create a PR
+rem Daniel Hermes, 20. June 2025
+rem file:///C:/Users/d363973/Cargill%20Inc/SAP%20BERLIN%20-%20Documents/Allgemeines/Anleitungen/Anwendung%20-%20Indirect%20Procurement/Anleitung_Anwendung_SAP_Inbound%20Delivery%20&%20Goods%20Movement.pdf
 If Not IsObject(application) Then
    Set SapGuiAuto  = GetObject("SAPGUI")
    Set application = SapGuiAuto.GetScriptingEngine
@@ -22,14 +20,17 @@ If IsObject(WScript) Then
 End If
 rem this stuff should normally always be the same
 session.findById("wnd[0]").maximize
-session.findById("wnd[0]/tbar[0]/okcd").text = "ME51N"
+session.findById("wnd[0]/tbar[0]/okcd").text = "VL31N"
 session.findById("wnd[0]").sendVKey 0 ' Enter key
-session.findById("wnd[0]").sendVKey 26 ' CTRL+F2 key (to expand header if not already expanded. Necessary to enter a header note)
 
-rem NEEDS TO BE CHANGED FOR EVERY PR
-Angebot = "268000"
-PreisNetto = "767,00"
-Service = "" ' leave empty for standard (physical thing), put D for service
+rem ENTER DATA HERE
+PurchaseOrder = "33456178"
+ExternalID = "OUBZB-025535"
+MeansOfTransport = "LKW B-AT-9744"
+
+
+
+
 
 
 
