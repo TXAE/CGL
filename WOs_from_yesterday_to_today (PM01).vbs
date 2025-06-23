@@ -1,4 +1,4 @@
-﻿' Daniel Hermes, 16. June 2025
+' Daniel Hermes, 23. June 2025
 ' pulls ALL (including completed) repair orders (PM01) from yesterday to today (or the whole weekend if today is a Monday) in 1GOB plant & prints them
 ' For credentials to be used automatically, make sure that your SAP login is saved in Windows Credential Manager (Control Panel\User Accounts\Credential Manager)
 ' as a generic windows credential with the following target:
@@ -17,30 +17,30 @@ psCode = _
 " public static extern void CredFree(IntPtr buffer);" & vbCrLf & _
 " [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]" & vbCrLf & _
 " public struct CREDENTIAL {" & vbCrLf & _
-"   public int Flags;" & vbCrLf & _
-"   public int Type;" & vbCrLf & _
-"   public string TargetName;" & vbCrLf & _
-"   public string Comment;" & vbCrLf & _
-"   public System.Runtime.InteropServices.ComTypes.FILETIME LastWritten;" & vbCrLf & _
-"   public int CredentialBlobSize;" & vbCrLf & _
-"   public IntPtr CredentialBlob;" & vbCrLf & _
-"   public int Persist;" & vbCrLf & _
-"   public int AttributeCount;" & vbCrLf & _
-"   public IntPtr Attributes;" & vbCrLf & _
-"   public string TargetAlias;" & vbCrLf & _
-"   public string UserName;" & vbCrLf & _
+"     public int Flags;" & vbCrLf & _
+"     public int Type;" & vbCrLf & _
+"     public string TargetName;" & vbCrLf & _
+"     public string Comment;" & vbCrLf & _
+"     public System.Runtime.InteropServices.ComTypes.FILETIME LastWritten;" & vbCrLf & _
+"     public int CredentialBlobSize;" & vbCrLf & _
+"     public IntPtr CredentialBlob;" & vbCrLf & _
+"     public int Persist;" & vbCrLf & _
+"     public int AttributeCount;" & vbCrLf & _
+"     public IntPtr Attributes;" & vbCrLf & _
+"     public string TargetAlias;" & vbCrLf & _
+"     public string UserName;" & vbCrLf & _
 " }" & vbCrLf & _
 "}" & vbCrLf & _
 "'@;" & vbCrLf & _
 "$ptr = [IntPtr]::Zero;" & vbCrLf & _
 "if ([CredMan]::CredRead('" & target & "', 1, 0, [ref]$ptr)) {" & vbCrLf & _
-"  $cred = [System.Runtime.InteropServices.Marshal]::PtrToStructure($ptr, [Type][CredMan+CREDENTIAL]);" & vbCrLf & _
-"  $pass = [System.Runtime.InteropServices.Marshal]::PtrToStringUni($cred.CredentialBlob, $cred.CredentialBlobSize / 2);" & vbCrLf & _
-"  Write-Output ('Username: ' + $cred.UserName);" & vbCrLf & _
-"  Write-Output ('Password: ' + $pass);" & vbCrLf & _
-"  [CredMan]::CredFree($ptr)" & vbCrLf & _
+"   $cred = [System.Runtime.InteropServices.Marshal]::PtrToStructure($ptr, [Type][CredMan+CREDENTIAL]);" & vbCrLf & _
+"   $pass = [System.Runtime.InteropServices.Marshal]::PtrToStringUni($cred.CredentialBlob, $cred.CredentialBlobSize / 2);" & vbCrLf & _
+"   Write-Output ('Username: ' + $cred.UserName);" & vbCrLf & _
+"   Write-Output ('Password: ' + $pass);" & vbCrLf & _
+"   [CredMan]::CredFree($ptr)" & vbCrLf & _
 "} else {" & vbCrLf & _
-"  Write-Output 'Credential not found or access denied.'" & vbCrLf & _
+"   Write-Output 'Credential not found or access denied.'" & vbCrLf & _
 "}"
 
 rem "  Write-Output $pass;" & vbCrLf & _ rem Used earlier to return just the pass
