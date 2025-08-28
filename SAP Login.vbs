@@ -290,9 +290,9 @@ Sub WaitForWindow(WindowTitle)
         "if ($hwnd -ne [IntPtr]::Zero) { [WinAPI]::SetForegroundWindow($hwnd) }"
     For i = 1 To timeoutInMilliseconds
         If shell.AppActivate(WindowTitle) Then
-            WScript.Echo "Window with title - " & WindowTitle & " - active after roughly " & i & " ms."
+            'WScript.Echo "Window with title - " & WindowTitle & " - active after roughly " & i & " ms."
             RunPowerShellScript(ForceWindowToForegroundPowerShellCode)
-            WScript.Echo "Forced window with title - " & WindowTitle & " - to foreground."
+            'WScript.Echo "Forced window with title - " & WindowTitle & " - to foreground."
             Exit Sub
         End If
         WScript.Sleep 1
