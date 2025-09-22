@@ -3,6 +3,9 @@
 ' Either user is already logged in, then easy.
 ' Otherwise check for saved credentials and try to log in with them.
 ' If no credentials are saved, script asks user to save credentials
+
+'TODO: Handle wrong user/password
+
 Option Explicit ' forces to declare all variables with Dim, Private, or Public
 Dim loadedFromAnotherScript, target, shell, fso, SapGuiAuto, application, connection, session, psCode, output, username, password, sapFilePath, file
 
@@ -20,7 +23,7 @@ Function SAPLogin()
     target = "TERMSRV/ceberr55mp.eu.corp.cargill.com"
     Set shell = CreateObject("WScript.Shell")
     Set fso = CreateObject("Scripting.FileSystemObject")
-
+    
     Set session = isLoggedIntoSAP()
     If session Is Nothing Then
         ' PowerShell-code checking if credential is already saved in credential manager
@@ -86,7 +89,7 @@ Function SAPLogin()
             Dim objNetwork
             Set objNetwork = CreateObject("WScript.Network")
             username = objNetwork.UserName
-
+            
             ' PowerShell-code asking user to input pw
             psCode = _
                 "Add-Type -AssemblyName System.Windows.Forms" & vbCrLf & _
@@ -115,13 +118,13 @@ Function SAPLogin()
                 "$form.ShowDialog() | Out-Null" & vbCrLf & _
                 "$pw = $form.Tag" & vbCrLf & _
                 "If ([string]::IsNullOrWhiteSpace($pw)) { Write-Output 1 } else { Write-Output $pw }"
-
+            
             password = RunPowerShellScript(psCode)
             If InStr(output, "1") = 1 Then
                 WScript.Echo "user did not enter a pw - terminating script"
                 WScript.Quit
             End If
-
+            
             'PowerShell-code saving credentials to credential manager
             psCode = _
                 "function Write-Credential {" & vbCrLf & _
@@ -174,7 +177,7 @@ Function SAPLogin()
                 "    }" & vbCrLf & _
                 "}" & vbCrLf & _
                 "Write-Credential -Target """ & target & """ -Username """ & username & """ -Password """ & password & """"
-
+            
             Dim credStoreResult
             credStoreResult = RunPowerShellScript(psCode)
             If InStr(credStoreResult, "CredWrite failed") = 1 Then
@@ -182,10 +185,10 @@ Function SAPLogin()
                 WScript.Quit
             End If
         End If
-
+        
         'set path to temporary .sap file
         sapFilePath = shell.ExpandEnvironmentStrings("%TEMP%") & "\temp_login.sap"
-
+        
         'write the .sap file contents
         Set file = fso.CreateTextFile(sapFilePath, True)
         file.WriteLine "[System]"
@@ -197,25 +200,25 @@ Function SAPLogin()
         file.WriteLine "[Function]"
         file.WriteLine "Title=" & username
         file.Close
-
+        
         'launch the .sap file
         shell.Run """" & sapFilePath & """"
-
-        WaitForWindow(username)
         
+        WaitForWindow(username)
+
         shell.SendKeys "{TAB}"
         shell.SendKeys password
         shell.SendKeys "{ENTER}"
-
-        WaitForWindow("SAP Easy Access")
         
+        WaitForWindow("SAP Easy Access")
+
         Set session = isLoggedIntoSAP()
         If session Is Nothing Then
             WScript.Echo "Auto login did not work :("
             WScript.Quit
         End If
     End If
-
+    
     session.findById("wnd[0]").maximize
     Set SAPLogin = session
 End Function
@@ -228,25 +231,25 @@ Function isLoggedIntoSAP()
     ' Try to get SAP GUI
     Set SapGuiAuto = GetObject("SAPGUI")
     If Err.Number = 0 Then
-
+        
         ' Try to get the scripting engine
         Set application = SapGuiAuto.GetScriptingEngine
         If Err.Number = 0 Then
-
+            
             ' Check if any connections exist
             If application.Children.Count > 0 Then
-
+                
                 ' Get the first connection
                 Set connection = application.Children(0)
                 If Err.Number = 0 Then
-
+                    
                     ' Check if any sessions exist
                     If connection.Children.Count > 0 Then
-
+                        
                         ' Get the first session
                         Set session = connection.Children(0)
                         If Err.Number = 0 Then
-
+                            
                             ' Check if session is active
                             'If session.Info.IsLowSpeedConnection = False Then
                             Set isLoggedIntoSAP = session
@@ -254,7 +257,7 @@ Function isLoggedIntoSAP()
                             'Else
                             '    WScript.Echo "SAP session found, but not fully connected."
                             'End If
-
+                            
                         End If
                     Else
                         'WScript.Echo "SAP login window is open, but user is not logged in."
@@ -273,58 +276,46 @@ Function isLoggedIntoSAP()
 End Function
 
 Sub WaitForWindow(WindowTitle)
-    Dim WindowFound, i, timeoutInMilliseconds, ForceWindowToForegroundPowerShellCode
-    
+    Dim WindowFound, i, timeoutInMilliseconds
+
     WindowFound = False
     timeoutInMilliseconds = 6000
-    ForceWindowToForegroundPowerShellCode = _
-        "Add-Type @'" & vbCrLf & _
-        "using System;" & vbCrLf & _
-        "using System.Runtime.InteropServices;" & vbCrLf & _
-        "public class WinAPI {" & vbCrLf & _
-        "  [DllImport(""user32.dll"")] public static extern bool SetForegroundWindow(IntPtr hWnd);" & vbCrLf & _
-        "  [DllImport(""user32.dll"")] public static extern IntPtr FindWindow(string lpClassName, string lpWindowName);" & vbCrLf & _
-        "}" & vbCrLf & _
-        "'@" & vbCrLf & _
-        "$hwnd = [WinAPI]::FindWindow($null, """ & windowTitle & """)" & vbCrLf & _
-        "if ($hwnd -ne [IntPtr]::Zero) { [WinAPI]::SetForegroundWindow($hwnd) }"
     For i = 1 To timeoutInMilliseconds
         If shell.AppActivate(WindowTitle) Then
             'WScript.Echo "Window with title - " & WindowTitle & " - active after roughly " & i & " ms."
-            RunPowerShellScript(ForceWindowToForegroundPowerShellCode)
             'WScript.Echo "Forced window with title - " & WindowTitle & " - to foreground."
             Exit Sub
         End If
         WScript.Sleep 1
     Next
-    
+
     WScript.Echo "App with title - " & WindowTitle & " - NOT found after roughly " & timeoutInMilliseconds & " ms."
     WScript.Quit
 End Sub
 
 Function RunPowerShellScript(psCode)
     Dim tempFolder, psFile, psPath, exec, output, line
-    
+
     ' Temporäre Datei erstellen
     Set tempFolder = fso.GetSpecialFolder(2) ' 2 = TemporaryFolder
     psPath = tempFolder & "\temp_script_" & Timer & ".ps1"
-    
+
     Set psFile = fso.CreateTextFile(psPath, True)
     psFile.Write psCode
     psFile.Close
-    
+
     ' PowerShell-Skript ausführen und Ausgabe lesen
     Set exec = shell.Exec("powershell.exe -ExecutionPolicy Bypass -File """ & psPath & """")
-    
+
     output = ""
     Do While Not exec.StdOut.AtEndOfStream
         line = exec.StdOut.ReadLine
         output = output & line & vbCrLf
     Loop
-    
+
     ' Temporäre Datei löschen
     On Error Resume Next
     fso.DeleteFile psPath
-    
+
     RunPowerShellScript = Trim(output)
 End Function
