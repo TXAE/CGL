@@ -6,9 +6,9 @@
 # Handles locked EXE copies with retry/fallback.
 # Accepts and ignores a stray "-and" switch to avoid invocation typos.
 # NOTE: This script intentionally avoids the PowerShell "-and" operator to prevent confusion.
-
+#
 # EXAMPLE USAGE:
-#.\Make-VbsExe.ps1 
+# .\Make-VbsExe.ps1 `
 #   -VbsPath "C:\Users\d363973\OneDrive - Cargill Inc\Documents\Cargill scripting\SAP\read Schichtbuch excel etc.vbs" `
 #   -SupportVbs "C:\Users\d363973\OneDrive - Cargill Inc\Documents\Cargill scripting\SAP\SAP Login.vbs" `
 #   -Runtime win-x86 `
@@ -16,99 +16,108 @@
 
 [CmdletBinding()]
 param(
-    # Path to the main VBScript (will be copied into the project and run as -MainScriptName)
-    [Parameter(Mandatory = $true)]
-    [string] $VbsPath,
+  # Path to the main VBScript (will be copied into the project and run as -MainScriptName)
+  [Parameter(Mandatory = $true)]
+  [string] $VbsPath,
 
-    # Additional .vbs files to include (e.g., "SAP Login.vbs"); copied into the project root.
-    [string[]] $SupportVbs = @(),
+  # Additional .vbs files to include (e.g., "SAP Login.vbs"); copied into the project root.
+  [string[]] $SupportVbs = @(),
 
-    # Name to give the main script inside the EXE payload (must be a file name only).
-    [string] $MainScriptName = "script.vbs",
+  # Name to give the main script inside the EXE payload (must be a file name only).
+  [string] $MainScriptName = "script.vbs",
 
-    # Project name used for the temporary build folder and EXE name.
-    [string] $ProjectName = "VbsRunner",
+  # Target runtime; use win-x86 for legacy 32-bit COM (common in SAP GUI), win-x64 otherwise.
+  [ValidateSet("win-x64","win-x86")]
+  [string] $Runtime = "win-x86",
 
-    # Target runtime; use win-x86 for legacy 32-bit COM (common in SAP GUI), win-x64 otherwise.
-    [ValidateSet("win-x64","win-x86")]
-    [string] $Runtime = "win-x86",
+  # Output folder where the final EXE is copied.
+  [string] $OutDir = ".\dist",
 
-    # Output folder where the final EXE is copied.
-    [string] $OutDir = ".\dist",
-
-    # Safety: ignore a stray "-and" in invocation (e.g., user typed -and between params)
-    [switch] $and
+  # Safety: ignore a stray "-and" in invocation (e.g., user typed -and between params)
+  [switch] $and
 )
 
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
 
 function Test-FileLocked {
-    param([Parameter(Mandatory=$true)][string]$Path)
-    try {
-        $fs = [System.IO.File]::Open($Path, 'Open', 'ReadWrite', 'None')
-        $fs.Close()
-        return $false
-    } catch [System.IO.IOException] {
-        return $true
-    }
+  param([Parameter(Mandatory=$true)][string]$Path)
+  try {
+    $fs = [System.IO.File]::Open($Path, 'Open', 'ReadWrite', 'None')
+    $fs.Close()
+    return $false
+  } catch [System.IO.IOException] {
+    return $true
+  }
 }
 
 function Copy-WithRetryOrTimestamp {
-    param(
-        [Parameter(Mandatory=$true)][string]$Source,
-        [Parameter(Mandatory=$true)][string]$Dest,
-        [int]$Retries = 10,
-        [int]$DelayMs = 500
-    )
-    for ($i = 0; $i -lt $Retries; $i++) {
-        try {
-            Copy-Item -LiteralPath $Source -Destination $Dest -Force
-            return $Dest
-        } catch [System.IO.IOException] {
-            Start-Sleep -Milliseconds $DelayMs
-        }
+  param(
+    [Parameter(Mandatory=$true)][string]$Source,
+    [Parameter(Mandatory=$true)][string]$Dest,
+    [int]$Retries = 10,
+    [int]$DelayMs = 500
+  )
+  for ($i = 0; $i -lt $Retries; $i++) {
+    try {
+      Copy-Item -LiteralPath $Source -Destination $Dest -Force
+      return $Dest
+    } catch [System.IO.IOException] {
+      Start-Sleep -Milliseconds $DelayMs
     }
-    # Fallback: copy to a timestamped file to avoid lock contention
-    $dir = Split-Path -Parent $Dest
-    $name = [System.IO.Path]::GetFileNameWithoutExtension($Dest)
-    $ext = [System.IO.Path]::GetExtension($Dest)
-    $stamp = Get-Date -Format "yyyyMMdd-HHmmss"
-    $alt = Join-Path $dir "$name-$stamp$ext"
-    Copy-Item -LiteralPath $Source -Destination $alt -Force
-    Write-Warning "Could not overwrite '$Dest' (file in use). Copied to '$alt' instead."
-    return $alt
+  }
+  # Fallback: copy to a timestamped file to avoid lock contention
+  $dir  = Split-Path -Parent $Dest
+  $name = [System.IO.Path]::GetFileNameWithoutExtension($Dest)
+  $ext  = [System.IO.Path]::GetExtension($Dest)
+  $stamp = Get-Date -Format "yyyyMMdd-HHmmss"
+  $alt = Join-Path $dir "$name-$stamp$ext"
+  Copy-Item -LiteralPath $Source -Destination $alt -Force
+  Write-Warning "Could not overwrite '$Dest' (file in use). Copied to '$alt' instead."
+  return $alt
 }
 
-# --- [0] Validate inputs -------------------------------------------------------
+# --- [0] Validate inputs -----------------------------------------------------
 Write-Host "[0/8] Validating inputs..."
 if (-not (Test-Path -LiteralPath $VbsPath)) {
-    throw "Main VBScript not found: $VbsPath"
+  throw "Main VBScript not found: $VbsPath"
 }
 foreach ($s in $SupportVbs) {
-    if (-not (Test-Path -LiteralPath $s)) {
-        throw "Support VBScript not found: $s"
-    }
+  if (-not (Test-Path -LiteralPath $s)) {
+    throw "Support VBScript not found: $s"
+  }
 }
 # Require a pure filename (no path) for the main script inside the payload.
-if ($MainScriptName -match '[\\/]' -or [string]::IsNullOrWhiteSpace($MainScriptName)) {
-    throw "-MainScriptName must be a file name without path (e.g., 'script.vbs'). Provided: '$MainScriptName'"
+if ($MainScriptName -match '[\\\/]' -or [string]::IsNullOrWhiteSpace($MainScriptName)) {
+  throw "-MainScriptName must be a file name without path (e.g., 'script.vbs'). Provided: '$MainScriptName'"
 }
 
-$VbsPath      = (Resolve-Path -LiteralPath $VbsPath).Path
-$SupportVbs   = $SupportVbs | ForEach-Object { (Resolve-Path -LiteralPath $_).Path }
-$ProjectDir   = Join-Path -Path (Get-Location) -ChildPath $ProjectName
+# Normalize paths
+$VbsPath    = (Resolve-Path -LiteralPath $VbsPath).Path
+$SupportVbs = $SupportVbs | ForEach-Object { (Resolve-Path -LiteralPath $_).Path }
+
+# Derive ProjectName from the last segment of VbsPath (filename without extension), sanitized for .NET project name
+$ProjectNameRaw = [System.IO.Path]::GetFileNameWithoutExtension($VbsPath)
+if ([string]::IsNullOrWhiteSpace($ProjectNameRaw)) {
+  throw "-VbsPath must point to a file."
+}
+# Replace any char not A-Za-z0-9_.- with underscore to keep it safe for project/exe names
+$ProjectName = ($ProjectNameRaw -replace '[^A-Za-z0-9_.-]', '_').Trim('_')
+
+if ([string]::IsNullOrWhiteSpace($ProjectName)) { $ProjectName = 'VbsRunner' }
+
+$ProjectDir = Join-Path -Path (Get-Location) -ChildPath $ProjectName
 
 if (-not (Get-Command dotnet -ErrorAction SilentlyContinue)) {
-    throw "dotnet CLI not found in PATH. Install .NET SDK 8+ and re-open your terminal. (Try 'dotnet --info')"
+  throw "dotnet CLI not found in PATH. Install .NET SDK 8+ and re-open your terminal. (Try 'dotnet --info')"
 }
 
-# --- [1] Create project --------------------------------------------------------
+# --- [1] Create project ------------------------------------------------------
 Write-Host "[1/8] Creating project '$ProjectName'..."
 if (Test-Path $ProjectDir) { Remove-Item $ProjectDir -Recurse -Force }
 dotnet new console -n $ProjectName | Out-Null
 
-# --- [2] Write .csproj embedding *all* .vbs files with exact file names -------
+# --- [2] Write .csproj embedding *all* .vbs files with exact file names -----
 Write-Host "[2/8] Writing project file (.csproj) to embed *.vbs..."
 @"
 <Project Sdk="Microsoft.NET.Sdk">
@@ -118,7 +127,6 @@ Write-Host "[2/8] Writing project file (.csproj) to embed *.vbs..."
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
   </PropertyGroup>
-
   <!-- Embed all .vbs files that are in the project root.
        LogicalName ensures the manifest resource name equals the actual file name. -->
   <ItemGroup>
@@ -151,7 +159,6 @@ internal static class Program
         args = args.Where(a => !string.Equals(a, "--pause", StringComparison.OrdinalIgnoreCase)).ToArray();
 
         var asm = Assembly.GetExecutingAssembly();
-
         var tempDir = Path.Combine(Path.GetTempPath(), $"VbsRunner_{Guid.NewGuid():N}");
         Directory.CreateDirectory(tempDir);
 
@@ -159,14 +166,12 @@ internal static class Program
         string mainScriptPath = Path.Combine(tempDir, mainScriptName);
 
         int exitCode = 0;
-
         try
         {
             // 1) Extract ALL embedded .vbs resources to temp, preserving their file names **as raw bytes**.
             var resources = asm.GetManifestResourceNames()
                                .Where(n => n.EndsWith(".vbs", StringComparison.OrdinalIgnoreCase))
                                .ToArray();
-
             if (resources.Length == 0)
             {
                 Console.Error.WriteLine("No embedded .vbs resources were found. Ensure your .csproj embeds *.vbs.");
@@ -177,8 +182,7 @@ internal static class Program
             {
                 string fileName = res; // LogicalName set to the file name, so res == "SomeFile.vbs"
                 string outPath = Path.Combine(tempDir, fileName);
-
-                using var inStream  = asm.GetManifestResourceStream(res)!;
+                using var inStream = asm.GetManifestResourceStream(res)!;
                 using var outStream = File.Create(outPath);
                 await inStream.CopyToAsync(outStream).ConfigureAwait(false);
             }
@@ -214,7 +218,6 @@ internal static class Program
             };
 
             using var proc = new Process { StartInfo = psi, EnableRaisingEvents = true };
-
             proc.OutputDataReceived += (_, e) => { if (e.Data != null) Console.Out.WriteLine(e.Data); };
             proc.ErrorDataReceived  += (_, e) => { if (e.Data != null) Console.Error.WriteLine(e.Data); };
 
@@ -236,7 +239,6 @@ internal static class Program
                 await proc.WaitForExitAsync();
                 exitCode = proc.ExitCode;
             }
-
             return exitCode;
         }
         finally
@@ -264,7 +266,8 @@ internal static class Program
     private static string Quote(string s)
         => string.IsNullOrEmpty(s) ? "\"\"" :
            (s.Contains(' ') || s.Contains('\t') || s.Contains('\"'))
-              ? "\"" + s.Replace("\"", "\\\"") + "\"" : s;
+           ? "\"" + s.Replace("\"", "\\\"") + "\""
+           : s;
 
     private static string? FindCScript()
     {
@@ -291,42 +294,44 @@ internal static class Program
 $csharp = $csharp.Replace('__MAIN_SCRIPT_NAME__', $MainScriptName)
 $csharp | Set-Content -Path (Join-Path $ProjectDir "Program.cs") -Encoding UTF8
 
-# --- [4] Copy VBS files into the project root ---------------------------------
+# --- [4] Copy VBS files into the project root --------------------------------
 Write-Host "[4/8] Copying your VBScript files into the project..."
 # Copy main VBScript under the desired name (e.g., script.vbs)
 Copy-Item -LiteralPath $VbsPath -Destination (Join-Path $ProjectDir $MainScriptName) -Force
+
 # Copy any support .vbs files, preserving their names
 foreach ($s in $SupportVbs) {
-    $leaf = Split-Path -Leaf $s
-    if ($leaf -ieq $MainScriptName) { continue } # don't overwrite main
-    Copy-Item -LiteralPath $s -Destination (Join-Path $ProjectDir $leaf) -Force
+  $leaf = Split-Path -Leaf $s
+  if ($leaf -ieq $MainScriptName) { continue } # don't overwrite main
+  Copy-Item -LiteralPath $s -Destination (Join-Path $ProjectDir $leaf) -Force
 }
 
-# --- [5] Restore ---------------------------------------------------------------
+# --- [5] Restore --------------------------------------------------------------
 Write-Host "[5/8] Restoring packages (if needed)..."
 Push-Location $ProjectDir
 dotnet restore -v minimal
 
-# --- [6] Publish ---------------------------------------------------------------
+# --- [6] Publish --------------------------------------------------------------
 Write-Host "[6/8] Publishing single-file, self-contained ($Runtime)..."
 dotnet publish -v minimal -c Release -r $Runtime -p:PublishSingleFile=true --self-contained true
 Pop-Location
 
-# --- [7] Collect output with retry/fallback -----------------------------------
+# --- [7] Collect output with retry/fallback ----------------------------------
 Write-Host "[7/8] Collecting output..."
 New-Item -ItemType Directory -Force -Path $OutDir | Out-Null
+
 $publishExe = Join-Path $ProjectDir "bin\Release\net8.0\$Runtime\publish\$ProjectName.exe"
 $destExe    = Join-Path $OutDir "$ProjectName.exe"
 
 # Avoid using "-and" here; use nested if for clarity and compat.
 if (Test-Path $destExe) {
-    if (Test-FileLocked -Path $destExe) {
-        Write-Warning "'$destExe' appears to be in use. Will retry for a short while, then fall back to a timestamped copy."
-    }
+  if (Test-FileLocked -Path $destExe) {
+    Write-Warning "'$destExe' appears to be in use. Will retry for a short while, then fall back to a timestamped copy."
+  }
 }
 $finalCopied = Copy-WithRetryOrTimestamp -Source $publishExe -Dest $destExe
 
-# --- [8] Done ------------------------------------------------------------------
+# --- [8] Done ----------------------------------------------------------------
 $finalPath = (Resolve-Path $finalCopied).Path
 Write-Host "[8/8] Done. Your EXE:" $finalPath
 Write-Host "Tip: Run with --pause to force a pause at the end, or set KEEP_VBSRUNNER_TEMP=1 to keep extracted files."
