@@ -245,8 +245,8 @@ internal static class Program
         {
             try
             {
-                if (Environment.GetEnvironmentVariable("KEEP_VBSRUNNER_TEMP") != "1" && Directory.Exists(tempDir))
-                    Directory.Delete(tempDir, recursive: true);
+                //if (Environment.GetEnvironmentVariable("KEEP_VBSRUNNER_TEMP") != "1" && Directory.Exists(tempDir))
+                    //Directory.Delete(tempDir, recursive: true);
             }
             catch { /* ignore cleanup issues */ }
 
