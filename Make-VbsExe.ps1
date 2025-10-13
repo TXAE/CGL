@@ -11,7 +11,6 @@
 # .\Make-VbsExe.ps1 `
 #   -VbsPath "C:\Users\d363973\OneDrive - Cargill Inc\Documents\Cargill scripting\SAP\read Schichtbuch excel etc.vbs" `
 #   -SupportVbs "C:\Users\d363973\OneDrive - Cargill Inc\Documents\Cargill scripting\SAP\SAP Login.vbs" `
-#   -Runtime win-x86 `
 #   -OutDir "C:\Users\d363973\OneDrive - Cargill Inc\2Do\SAP_Script\"
 
 [CmdletBinding()]
