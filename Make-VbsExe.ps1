@@ -159,7 +159,7 @@ internal static class Program
         args = args.Where(a => !string.Equals(a, "--pause", StringComparison.OrdinalIgnoreCase)).ToArray();
 
         var asm = Assembly.GetExecutingAssembly();
-        var tempDir = Path.Combine(Path.GetTempPath(), $"VbsRunner_{Guid.NewGuid():N}");
+        var tempDir = AppContext.BaseDirectory;
         Directory.CreateDirectory(tempDir);
 
         string mainScriptName = "__MAIN_SCRIPT_NAME__";
