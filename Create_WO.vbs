@@ -36,3 +36,8 @@ MsgBox(session.findById("wnd[0]/sbar").text)
 
 session.StartTransaction "IW32"
 session.findById("wnd[0]").sendVKey 0 'press enter
+session.findById("wnd[0]").maximize
+' set Functional Location back to 1GOB and delete Equipment to make it quicker to select a different functional location & equipment than set by default 
+session.findById("wnd[0]/usr/subSUB_ALL:SAPLCOIH:3001/ssubSUB_LEVEL:SAPLCOIH:1100/tabsTS_1100/tabpIHKZ/ssubSUB_AUFTRAG:SAPLCOIH:1120/subOBJECT:SAPLCOIH:7100/ctxtCAUFVD-TPLNR").text = "1GOB"
+session.findById("wnd[0]/usr/subSUB_ALL:SAPLCOIH:3001/ssubSUB_LEVEL:SAPLCOIH:1100/tabsTS_1100/tabpIHKZ/ssubSUB_AUFTRAG:SAPLCOIH:1120/subOBJECT:SAPLCOIH:7100/ctxtCAUFVD-EQUNR").text = ""
+session.findById("wnd[0]").sendVKey 0 'press enter
