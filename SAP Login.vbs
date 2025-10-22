@@ -192,9 +192,9 @@ Function SAPLogin()
         'write the .sap file contents
         Set file = fso.CreateTextFile(sapFilePath, True)
         file.WriteLine "[System]"
-        file.WriteLine "Name=PW1"
-        file.WriteLine "Description=PRD: PW1 ERP TC2"
-        file.WriteLine "Client=100"
+        file.WriteLine "Name=PW1" 'QW3"
+        'file.WriteLine "Description=PRD: PW1 ERP TC2"
+        file.WriteLine "Client=100" 'needed, otherwise will always get script-warning-popup from SAP!
         file.WriteLine "[User]"
         file.WriteLine "Name=" & username
         file.WriteLine "[Function]"
