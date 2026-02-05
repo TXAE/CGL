@@ -78,7 +78,7 @@ This VBScript scans the shift logbook Excel, identifies entries not yet processe
    - [`SAP Login.vbs`](SAP%20Login.vbs)
 2. Ensure folder is writable (script creates `./logs/`)
 3. Ensure SAP GUI scripting is enabled:
-   ![](https://github.com/TXAE/CGL/blob/main/how_to_enable_scripting_in_SAP.png?raw=true)
+   ![https://github.com/TXAE/CGL/blob/main/how_to_enable_scripting_in_SAP.png](https://github.com/TXAE/CGL/blob/main/how_to_enable_scripting_in_SAP.png)
 5. Run the script
    - from [command-line](#command-line-usage) or
    - import the [windows task](shift%20logbook%20script%20windows%20task.xml) to the windows task scheduler to let the script run automatically (e.g. every day at 2PM)
