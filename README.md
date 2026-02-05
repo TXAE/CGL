@@ -1,6 +1,6 @@
 # Schichtbuch → SAP Sync (VBScript)
 
-Automate the double work of logging maintenance tasks twice: once in the Excel **Schichtbuch** and once in **SAP PM**.  
+Automate the double work of logging maintenance tasks twice: once in the Excel **Schichtbuch** and again in **SAP**.  
 This VBScript scans the shift logbook Excel, identifies entries not yet processed in SAP, and **confirms, completes, or cancels** the corresponding SAP work orders (IW41 / IW32), either fully automatically or with user confirmations.
 
 > 🧑‍🏭 Typical users: Maintenance & Reliability (M&R) planners, supervisors, managers
@@ -17,7 +17,7 @@ This VBScript scans the shift logbook Excel, identifies entries not yet processe
 - [Installation](#installation)
 - [Excel layout & data mapping](#excel-layout--data-mapping)
 - [Command-line usage](#command-line-usage)
-- [Parameter defaults](#parameter-defaults)
+- [Parameter details](#parameter-details)
 - [Run examples](#run-examples)
 - [Logging](#logging)
 - [Safety checks & guardrails](#safety-checks--guardrails)
@@ -74,10 +74,13 @@ This VBScript scans the shift logbook Excel, identifies entries not yet processe
 ## Installation
 
 1. Place these files in the same directory:
-   - [`Schichtbuch script.vbs`](https://github.com/TXAE/CGL/blob/main/Schichtbuch%20script.vbs)
-   - [`SAP Login.vbs`](https://github.com/TXAE/CGL/blob/main/SAP%20Login.vbs)
+   - [`Schichtbuch script.vbs`](Schichtbuch%20script.vbs)
+   - [`SAP Login.vbs`](SAP%20Login.vbs)
 2. Ensure folder is writable (script creates `./logs/`)
 3. Ensure SAP GUI scripting is enabled
+4. Run the script
+   - from [command-line](#command-line-usage) or
+   - import the [windows task](shift%20logbook%20script%20windows%20task.xml) to the windows task scheduler to let the script run automatically (e.g. every day at 2PM)
 
 ---
 
@@ -98,6 +101,7 @@ This VBScript scans the shift logbook Excel, identifies entries not yet processe
 | 12 | DauerInH (fraction or time) |
 | 15 | Status (matches sheet 2) |
 | 16 | Script output message |
+| 17 | Operation in SAP WO (optional) |
 
 ### Sheet 2 (Mappings)
 
@@ -116,43 +120,45 @@ cscript //nologo "Schichtbuch script.vbs" [filePath=<path_or_url>] [autoConfirm=
 
 ---
 
-## Parameter defaults
+## Parameter details
 
 ### `filePath`
-**Default:** not provided  
+**Default:** not provided
 **Behavior:**
-- If `useCurrentExcel=yes` → script builds current-month SharePoint path
-- Otherwise → shows Excel file-open dialog
+- If filePath provided: Uses <path_or_url> e.g. filePath="C:\Data\Schichtbuch.xlsx"
+- If no filePath provided:
+   - If `useCurrentExcel=yes` → script builds current-month SharePoint path (specific to Berlin)
+   - Otherwise → shows Excel file-open dialog so user can select a file
 
 ### `autoConfirm`
-**Default:** not provided  
-**Behavior:** script asks user:
-- **Yes** → automatic confirmations
-- **No** → ask before each confirmation
+**Default:** not provided - script asks user once at the beginning of script run:
+**Behavior:**
+- `yes` → automatic confirmations to SAP
+- `no`  → ask before each confirmation to SAP (user can click yes, no or cancel)
 
 ### `useCurrentExcel`
-**Default:** no  
+**Default:** not provided - interpreted as `no`
 **Behavior:**
 - `yes` → build SharePoint path for current month's Schichtbuch
-- `no` → normal file selection process
+- `no`  → normal file selection process
 
 ---
 
 ## Run examples
 
-### Interactive
+### Fully automatic (Auto-select current month, specific to Berlin plant)
 ```
-cscript //nologo "Schichtbuch script.vbs"
+cscript //nologo "Schichtbuch script.vbs" useCurrentExcel=yes autoConfirm=yes
 ```
 
-### Fully automatic
+### Fully automatic (using a provided filePath, e.g. when you want to run the script on an older month's shift logbook)
 ```
 cscript //nologo "Schichtbuch script.vbs" filePath="C:\Data\Schichtbuch.xlsx" autoConfirm=yes
 ```
 
-### Auto-select current month
+### Interactive (asks user about everything, very slow, good for debugging)
 ```
-cscript //nologo "Schichtbuch script.vbs" useCurrentExcel=yes autoConfirm=yes
+cscript //nologo "Schichtbuch script.vbs"
 ```
 
 ---
