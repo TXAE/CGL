@@ -15,11 +15,11 @@ This VBScript scans the shift logbook Excel, identifies entries not yet processe
 - [How it works](#how-it-works)
 - [Prerequisites](#prerequisites)
 - [Installation](#installation)
-- [Excel layout & data mapping](#excel-layout--data-mapping)
 - [Command-line usage](#command-line-usage)
 - [Parameter details](#parameter-details)
 - [Run examples](#run-examples)
 - [Logging](#logging)
+- [Excel layout & data mapping](#excel-layout--data-mapping)
 - [Safety checks & guardrails](#safety-checks--guardrails)
 - [Known limitations](#known-limitations)
 - [Troubleshooting](#troubleshooting)
@@ -84,34 +84,6 @@ This VBScript scans the shift logbook Excel, identifies entries not yet processe
 
 ---
 
-## Excel layout & data mapping
-
-### Sheet 1 (Schichtbuch)
-
-| Column | Description |
-|--------|-------------|
-| 1 | Date (Tag) |
-| 3 | WO_Nr (must be 9 digits starting with 4) |
-| 5 | Employee(s) separated by `/` |
-| 7 | Bemerkung |
-| 8 | Fehlerbeschreibung |
-| 9 | Massnahme (max 40 chars) |
-| 10 | Startzeit (Excel fraction) |
-| 11 | Endzeit (Excel fraction) |
-| 12 | DauerInH (fraction or time) |
-| 15 | Status (matches sheet 2) |
-| 16 | Script output message |
-| 17 | Operation in SAP WO (optional) |
-
-### Sheet 2 (Mappings)
-
-- Column A: Employee name
-- Column B: Personnel number
-- Cell E4: "done" text
-- Cell E5: "cancelled" text
-
----
-
 ## Command-line usage
 
 ```
@@ -166,6 +138,34 @@ cscript //nologo "Schichtbuch script.vbs"
 ## Logging
 
 Stored in `./logs/<script>_<user>_<timestamp>.log`.
+
+---
+
+## Excel layout & data mapping
+
+### Sheet 1 (Schichtbuch)
+
+| Column | Description |
+|--------|-------------|
+| 1 | Tag (Date) |
+| 3 | WO_Nr (must be 9 digits) |
+| 5 | Employee(s) separated by `/` |
+| 7 | WO Title |
+| 8 | Fehlerbeschreibung (what's wrong?) |
+| 9 | Massnahme (what was done?) |
+| 10 | Startzeit (start time) |
+| 11 | Endzeit (finish time) |
+| 12 | DauerInH (duration) |
+| 15 | Status (state, matches sheet 2) |
+| 16 | Script output message |
+| 17 | Operation in SAP WO (optional) |
+
+### Sheet 2 (Mappings)
+
+- Column A: Employee name
+- Column B: Personnel number
+- Cell E4: "done" text
+- Cell E5: "cancelled" text
 
 ---
 
