@@ -162,7 +162,7 @@ For i = 2 To lastRow ' Assuming row 1 is header
                     SafeSetText "wnd[0]/usr/ctxtGSTRP-HIGH", Basic_Start_Date_HIGH ' Basic Start Date - HIGH
                     SafeSetText "wnd[0]/usr/ctxtDATUV", "" ' Period - LOW
                     SafeSetText "wnd[0]/usr/ctxtDATUB", "" ' Period - HIGH
-                    SafeSetText "wnd[0]/usr/ctxtSWERK-LOW", SAP_plantcode)
+                    SafeSetText "wnd[0]/usr/ctxtSWERK-LOW", SAP_plantcode
                     SafeSendVKey "wnd[0]", 8 ' Execute (F8)
                     
                     Dim grid, rowCount, colCount, ord, r, c
@@ -639,7 +639,7 @@ Function Check_if_WO_needs_TECO(wo_Nr)
     orderText = SafeGetText("wnd[0]/usr/subSUB_ALL:SAPLCOIH:3001/ssubSUB_LEVEL:SAPLCOIH:1100/subSUB_KOPF:SAPLCOIH:1102/subSUB_TEXT:SAPLCOIH:1103/cntlLTEXT/shell")
     SafeSetText "wnd[0]/usr/subSUB_ALL:SAPLCOIH:3001/ssubSUB_LEVEL:SAPLCOIH:1100/subSUB_KOPF:SAPLCOIH:1102/subSUB_TEXT:SAPLCOIH:1103/cntlLTEXT/shell", _
         orderText & vbCr & vbCr & _
-        "Completed by script executed by user " & username & " on " & Now & " using data from excel" & vbCr & filePath)
+        "Completed by script executed by user " & username & " on " & Now & " using data from excel" & vbCr & filePath
     
     If autoConfirmResponse = vbYes Then
         CNF_Not_CAPR_response = vbYes
