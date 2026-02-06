@@ -299,11 +299,12 @@ Function isLoggedIntoSAP()
 End Function
 
 Sub WaitForWindow(WindowTitle)
-    Dim WindowFound, i, timeoutInMilliseconds
+    Dim startTime, elapsedTime, timeoutInMilliseconds
     Dim activeTitle, psCode
-    WindowFound = False
     timeoutInMilliseconds = 6000
-    For i = 1 To timeoutInMilliseconds
+    startTime = Timer
+    
+    Do While True
         ' Attempt to bring any window whose MainWindowTitle contains WindowTitle to the foreground,
         ' then return the current foreground window title so we can verify focus.
         psCode = _
@@ -337,8 +338,14 @@ Sub WaitForWindow(WindowTitle)
             End If
         End If
 
+        ' Check if timeout exceeded (convert Timer output to milliseconds)
+        elapsedTime = (Timer - startTime) * 1000
+        If elapsedTime >= timeoutInMilliseconds Then
+            Exit Do
+        End If
+
         WScript.Sleep 100
-    Next
+    Loop
 
     WScript.Echo "App with title - " & WindowTitle & " - NOT found in foreground after roughly " & timeoutInMilliseconds & " ms."
     WScript.Quit
