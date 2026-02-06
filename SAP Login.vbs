@@ -7,7 +7,7 @@
 'TODO: Handle wrong user/password
 
 Option Explicit ' forces to declare all variables with Dim, Private, or Public
-Dim loadedFromAnotherScript, target, shell, fso, SapGuiAuto, application, connection, session, psCode, output, username, password, sapFilePath, file
+Dim loadedFromAnotherScript, target, shell, fso, SapGuiAuto, application, connection, session, psCode, output, username, password, sapFilePath, file, dump
 
 If IsEmpty(loadedFromAnotherScript) Then
     ' --- Only run this if not called from another script --
@@ -15,7 +15,8 @@ If IsEmpty(loadedFromAnotherScript) Then
     Set session = SAPLogin()
     'WScript.Echo "SAP session ID: " & session.Id
 Else
-    ' --- Don't run SAPLogin() here if called from another script -- other script will call SAPLogin()-function itself to get session-object
+    ' --- Don't run SAPLogin() here if called from another script
+    ' The other script loads this script entirely & will call SAPLogin()-function itself to get session-object
     'WScript.Echo "Loaded from another script: " & WScript.ScriptFullName
 End If
 
@@ -203,13 +204,32 @@ Function SAPLogin()
         
         'launch the .sap file
         shell.Run """" & sapFilePath & """"
+        dump = Now & "- Launched SAP login window with .sap file for user: " & username & " - waiting for login window..."
         
+        'wait for the login window to appear
         WaitForWindow(username)
-
-        shell.SendKeys "{TAB}"
-        shell.SendKeys password
-        shell.SendKeys "{ENTER}"
+        dump = dump & vbCrLf & Now & "- SAP login window appeared."
         
+        ' Try to set username/password programmatically (WM_SETTEXT) and post Enter.
+        Dim setResult
+        setResult = TrySetLoginFields(username, username, password)
+
+        If InStr(setResult, "OK") > 0 Then
+            ' fields set and Enter posted by PowerShell
+            dump = dump & vbCrLf & Now & "- TrySetLoginFields result: " & setResult
+            dump = dump & vbCrLf & Now & "- Successfully set username and password into SAP login window and posted Enter via PowerShell. Now waiting for SAP Easy Access window..."
+        Else
+            dump = dump & vbCrLf & Now & "- ERROR! TrySetLoginFields result: " & setResult
+            WScript.Echo dump
+            WScript.Quit
+
+            ' fallback to previous SendKeys approach - not working reliably, because SAP login window often does not get focused properly, so keys are sent to the wrong window
+            ' ALSO RISKY BECAUSE IF SOMEONE HAS ANOTHER WINDOW WITH FOCUS, PASSWORD WOULD BE SENT THERE! DO NOT USE!
+            'shell.SendKeys "{TAB}"
+            'shell.SendKeys password
+            'shell.SendKeys "{ENTER}"
+        End If
+
         WaitForWindow("SAP Easy Access")
 
         Set session = isLoggedIntoSAP()
@@ -221,6 +241,9 @@ Function SAPLogin()
     
     session.findById("wnd[0]").maximize
     Set SAPLogin = session
+
+    dump = dump & vbCrLf & Now & "- Done!"
+    'WScript.Echo dump ' ENABLE THIS TO DEBUG
 End Function
 
 'Checks if user is logged into SAP. Returns the session-object if is logged in, NULL if not logged in
@@ -277,19 +300,47 @@ End Function
 
 Sub WaitForWindow(WindowTitle)
     Dim WindowFound, i, timeoutInMilliseconds
-
+    Dim activeTitle, psCode
     WindowFound = False
     timeoutInMilliseconds = 6000
     For i = 1 To timeoutInMilliseconds
-        If shell.AppActivate(WindowTitle) Then
-            'WScript.Echo "Window with title - " & WindowTitle & " - active after roughly " & i & " ms."
-            'WScript.Echo "Forced window with title - " & WindowTitle & " - to foreground."
-            Exit Sub
+        ' Attempt to bring any window whose MainWindowTitle contains WindowTitle to the foreground,
+        ' then return the current foreground window title so we can verify focus.
+        psCode = _
+            "Add-Type -TypeDefinition @'" & vbCrLf & _
+            "using System; using System.Runtime.InteropServices;" & vbCrLf & _
+            "public class U {" & vbCrLf & _
+            " [DllImport(""user32.dll"")] public static extern bool SetForegroundWindow(IntPtr hWnd);" & vbCrLf & _
+            " [DllImport(""user32.dll"")] public static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);" & vbCrLf & _
+            "}" & vbCrLf & _
+            "'@;" & vbCrLf & _
+            "$target = '" & Replace(WindowTitle, "'", "''") & "';" & vbCrLf & _
+            "$proc = Get-Process | Where-Object { $_.MainWindowHandle -ne 0 -and $_.MainWindowTitle -and $_.MainWindowTitle -like (""*"" + $target + ""*"") } | Select -First 1;" & vbCrLf & _
+            "if ($proc) { $h = $proc.MainWindowHandle; [U]::ShowWindow($h,5) | Out-Null; [U]::SetForegroundWindow($h) | Out-Null }" & vbCrLf & _
+            "Add-Type -TypeDefinition @'" & vbCrLf & _
+            "using System; using System.Runtime.InteropServices; using System.Text;" & vbCrLf & _
+            "public class Win {" & vbCrLf & _
+            " [DllImport(""user32.dll"")] public static extern IntPtr GetForegroundWindow();" & vbCrLf & _
+            " [DllImport(""user32.dll"", CharSet=CharSet.Auto)] public static extern int GetWindowText(IntPtr hWnd, StringBuilder lpString, int nMaxCount);" & vbCrLf & _
+            "}" & vbCrLf & _
+            "'@;" & vbCrLf & _
+            "$sb = New-Object System.Text.StringBuilder 1024;" & vbCrLf & _
+            "$hwnd = [Win]::GetForegroundWindow();" & vbCrLf & _
+            "if ($hwnd -eq [IntPtr]::Zero) { Write-Output '' } else { [Win]::GetWindowText($hwnd,$sb,$sb.Capacity) | Out-Null; Write-Output $sb.ToString() }"
+
+        activeTitle = RunPowerShellScript(psCode)
+
+        ' Compare case-insensitive and allow partial match (titles often include extra text)
+        If Len(activeTitle) > 0 Then
+            If InStr(LCase(activeTitle), LCase(WindowTitle)) > 0 Then
+                Exit Sub
+            End If
         End If
-        WScript.Sleep 1
+
+        WScript.Sleep 100
     Next
 
-    WScript.Echo "App with title - " & WindowTitle & " - NOT found after roughly " & timeoutInMilliseconds & " ms."
+    WScript.Echo "App with title - " & WindowTitle & " - NOT found in foreground after roughly " & timeoutInMilliseconds & " ms."
     WScript.Quit
 End Sub
 
@@ -305,7 +356,7 @@ Function RunPowerShellScript(psCode)
     psFile.Close
 
     ' PowerShell-Skript ausführen und Ausgabe lesen
-    Set exec = shell.Exec("powershell.exe -ExecutionPolicy Bypass -File """ & psPath & """")
+    Set exec = shell.Exec("powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File """ & psPath & """")
 
     output = ""
     Do While Not exec.StdOut.AtEndOfStream
@@ -318,4 +369,33 @@ Function RunPowerShellScript(psCode)
     fso.DeleteFile psPath
 
     RunPowerShellScript = Trim(output)
+End Function
+
+' Attempts to set username/password into the login window edit controls using WM_SETTEXT
+' Returns the raw output from the PowerShell script (e.g. 'OK', 'USER_SET_ONLY', 'NO_EDITS', 'NOTFOUND')
+Function TrySetLoginFields(WindowTitle, u, p)
+    Dim psCode
+    psCode = _
+        "Add-Type -TypeDefinition @'" & vbCrLf & _
+        "using System;" & vbCrLf & _
+        "using System.Text;" & vbCrLf & _
+        "using System.Runtime.InteropServices;" & vbCrLf & _
+        "public static class W {" & vbCrLf & _
+        " [DllImport(""user32.dll"", CharSet=CharSet.Auto, SetLastError=true)] public static extern IntPtr FindWindow(string lpClassName, string lpWindowName);" & vbCrLf & _
+        " [DllImport(""user32.dll"", CharSet=CharSet.Auto, SetLastError=true)] public static extern IntPtr FindWindowEx(IntPtr hwndParent, IntPtr hwndChildAfter, string lpszClass, string lpszWindow);" & vbCrLf & _
+        " [DllImport(""user32.dll"", CharSet=CharSet.Unicode)] public static extern IntPtr SendMessage(IntPtr hWnd, UInt32 Msg, IntPtr wParam, string lParam);" & vbCrLf & _
+        " [DllImport(""user32.dll"", SetLastError=true)] public static extern bool PostMessage(IntPtr hWnd, UInt32 Msg, IntPtr wParam, IntPtr lParam);" & vbCrLf & _
+        "}" & vbCrLf & _
+        "'@;" & vbCrLf & _
+        "$WM_SETTEXT = 0x000C; $WM_KEYDOWN = 0x0100; $WM_KEYUP = 0x0101; $VK_RETURN = 0x0D;" & vbCrLf & _
+        "$title = '" & Replace(WindowTitle, "'", "''") & "';" & vbCrLf & _
+        "$user = '" & Replace(u, "'", "''") & "';" & vbCrLf & _
+        "$pw = '" & Replace(p, "'", "''") & "';" & vbCrLf & _
+        "$hWnd = [W]::FindWindow($null, $title);" & vbCrLf & _
+        "if ($hWnd -eq [IntPtr]::Zero) { $proc = Get-Process | Where-Object { $_.MainWindowHandle -ne 0 -and $_.MainWindowTitle -and $_.MainWindowTitle -like ('*' + $title + '*') } | Select -First 1; if ($proc) { $hWnd = $proc.MainWindowHandle } }" & vbCrLf & _
+        "if ($hWnd -eq [IntPtr]::Zero) { Write-Output 'NOTFOUND'; exit 1 }" & vbCrLf & _
+        "$hEdit1 = [W]::FindWindowEx($hWnd, [IntPtr]::Zero, 'Edit', $null);" & vbCrLf & _
+        "if ($hEdit1 -ne [IntPtr]::Zero) { [W]::SendMessage($hEdit1, $WM_SETTEXT, [IntPtr]::Zero, $user) | Out-Null; $hEdit2 = [W]::FindWindowEx($hWnd, $hEdit1, 'Edit', $null); if ($hEdit2 -ne [IntPtr]::Zero) { [W]::SendMessage($hEdit2, $WM_SETTEXT, [IntPtr]::Zero, $pw) | Out-Null; [W]::PostMessage($hWnd, $WM_KEYDOWN, [IntPtr]$VK_RETURN, [IntPtr]0) | Out-Null; [W]::PostMessage($hWnd, $WM_KEYUP, [IntPtr]$VK_RETURN, [IntPtr]0) | Out-Null; Write-Output 'OK'; exit 0 } else { Write-Output 'USER_SET_ONLY'; exit 0 } } else { Write-Output 'NO_EDITS'; exit 2 }"
+
+    TrySetLoginFields = RunPowerShellScript(psCode)
 End Function
