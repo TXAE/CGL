@@ -5,6 +5,7 @@
 ' If no credentials are saved, script asks user to save credentials
 
 'TODO: Handle wrong user/password
+'TODO: Handle scripting disabled by user
 
 Option Explicit ' forces to declare all variables with Dim, Private, or Public
 Dim loadedFromAnotherScript, target, shell, fso, SapGuiAuto, application, connection, session, psCode, output, username, password, sapFilePath, file, dump
@@ -68,6 +69,7 @@ Function SAPLogin()
         username = ""
         password = ""
         If InStr(output, "Username: ") = 1 Then
+            ' credential is already saved in credential manager - parse username and password from output
             Dim lines, line
             lines = Split(output, vbCrLf)
             For Each line In lines
