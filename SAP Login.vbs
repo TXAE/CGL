@@ -121,7 +121,7 @@ Function SAPLogin()
                 "If ([string]::IsNullOrWhiteSpace($pw)) { Write-Output 1 } else { Write-Output $pw }"
             
             password = RunPowerShellScript(psCode)
-            If InStr(output, "1") = 1 Then
+            If InStr(password, "1") = 1 Then
                 WScript.Echo "user did not enter a pw - terminating script"
                 WScript.Quit
             End If
@@ -301,7 +301,7 @@ End Function
 Sub WaitForWindow(WindowTitle)
     Dim startTime, elapsedTime, timeoutInMilliseconds
     Dim activeTitle, psCode
-    timeoutInMilliseconds = 6000
+    timeoutInMilliseconds = 9000
     startTime = Timer
     
     Do While True
