@@ -11,6 +11,7 @@ This VBScript scans the [**shift logbook excel**](Muster_2026_Schichtbuch.xlsx),
 
 ## Table of contents
 
+- [Flowchart](#flowchart)
 - [Features](#features)
 - [How it works](#how-it-works)
 - [Prerequisites](#prerequisites)
@@ -23,6 +24,12 @@ This VBScript scans the [**shift logbook excel**](Muster_2026_Schichtbuch.xlsx),
 - [Safety checks & guardrails](#safety-checks--guardrails)
 - [Known limitations](#known-limitations)
 - [Troubleshooting](#troubleshooting)
+
+---
+
+## Flowchart
+
+![shift logbook script flow.png](shift%logbook%script%flow.png)
 
 ---
 
@@ -78,7 +85,7 @@ This VBScript scans the [**shift logbook excel**](Muster_2026_Schichtbuch.xlsx),
    - [`SAP Login.vbs`](SAP%20Login.vbs)
 2. Ensure folder is writable (script creates `./logs/`)
 3. Ensure SAP GUI scripting is enabled:
-   ![https://github.com/TXAE/CGL/blob/main/how_to_enable_scripting_in_SAP.png](https://github.com/TXAE/CGL/blob/main/how_to_enable_scripting_in_SAP.png)
+   ![how_to_enable_scripting_in_SAP.png](how_to_enable_scripting_in_SAP.png)
 5. Run the script
    - from [command-line](#command-line-usage) or
    - import the [windows task](shift%20logbook%20script%20windows%20task.xml) to the windows task scheduler to let the script run automatically (e.g. every day at 2PM)
