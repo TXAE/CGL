@@ -1,7 +1,7 @@
 # Schichtbuch → SAP Sync (VBScript)
 
-Automate the double work of logging maintenance tasks twice: once in the Excel **Schichtbuch** and again in **SAP**.  
-This VBScript scans the shift logbook Excel, identifies entries not yet processed in SAP, and **confirms, completes, or cancels** the corresponding SAP work orders (IW41 / IW32), either fully automatically or with user confirmations.
+Automate the double work of logging maintenance tasks twice: once in the [**shift logbook excel**](Muster_2026_Schichtbuch.xlsx) and again in **SAP**.  
+This VBScript scans the [**shift logbook excel**](Muster_2026_Schichtbuch.xlsx), identifies entries not yet processed in SAP, and **confirms, completes, or cancels** the corresponding SAP work orders (using T-codes IW41 / IW32), either fully automatically or with user confirmations.
 
 > 🧑‍🏭 Typical users: Maintenance & Reliability (M&R) planners, supervisors, managers
 
@@ -28,13 +28,13 @@ This VBScript scans the shift logbook Excel, identifies entries not yet processe
 
 ## Features
 
-- 🔍 **Reads the Schichtbuch Excel** in bulk (fast, minimal COM calls)
-- 👷 **Maps employee names → SAP personnel numbers** using sheet 2 (lenient name matching)
+- 🔍 **Reads the [shift logbook excel](Muster_2026_Schichtbuch.xlsx)** in bulk (fast, minimal COM calls)
+- 👷 **Maps employee names → SAP personnel numbers** from another sheet (can use lenient name matching)
 - 🕒 **Converts Excel time fractions** into proper timestamps and correctly handles **overnight work**
-- 🌍 Converts all timestamps to **UTC** using Windows ActiveTimeBias
+- 🌍 Ensures all timestamps are **UTC** (using Windows ActiveTimeBias registry entry)
 - 🗃️ **Confirms work orders** in IW41 including short texts, work duration, start/end, and final confirmation settings
-- ❌ **Cancels orders** in IW32 when the Excel log marks them as cancelled
-- 🧹 **Optionally completes (TECO)** confirmed work orders
+- ❌ **Cancels orders** in IW32 when the [shift logbook excel](Muster_2026_Schichtbuch.xlsx) marks them as cancelled
+- 🧹 **Completes (TECO)** work orders when the [shift logbook excel](Muster_2026_Schichtbuch.xlsx) marks them as complete
 - 📄 **Writes back results** to the Excel (column 16) only if no existing message is present
 - 🔁 **Optional helper:** copies upcoming PMs from **IW38** into the Excel (layout-dependent)
 - 🛡️ Robust SAP wrappers (`SafeFindById`, `SafeSetText`, `SafeSendVKey`, etc.)  
@@ -49,8 +49,8 @@ This VBScript scans the shift logbook Excel, identifies entries not yet processe
    - `filePath` argument
    - OR `useCurrentExcel=yes` (builds SharePoint path)
    - OR file-open dialog (default)
-3. Excel is opened; sheet 1 & sheet 2 are bulk-read for performance.
-4. Each row in sheet 1 is validated and processed:
+3. Excel is opened; content is bulk-read for performance.
+4. Each row is validated and processed:
    - Checks WO, employee, status, times
    - Cancels orders in IW32 when needed
    - Determines SAP status and skip-conditions
@@ -66,7 +66,7 @@ This VBScript scans the shift logbook Excel, identifies entries not yet processe
 - Windows with **Windows Script Host (WSH)**
 - SAP GUI 7.x+ with **scripting enabled** (client + server)
 - Microsoft Excel installed
-- SAP access to IW32, IW33, IW38, IW41
+- SAP access to IW32, IW33, IW38, IW41 & to the corresponding work orders
 - IW38 helper requires ALV layout with **technical field names**
 
 ---
