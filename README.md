@@ -29,7 +29,7 @@ This VBScript scans the [**shift logbook excel**](Muster_2026_Schichtbuch.xlsx),
 
 ## Flowchart
 
-![shift logbook script flow.png](shift%logbook%script%flow.png)
+![shift logbook script flow.png](shift%20logbook%20script%20flow.png)
 
 ---
 
