@@ -751,7 +751,7 @@ Function GetpersonnelNumber(employeeName)
     Next
     
     ' If no match found in sheet2, log and return empty (don't confirm with personnel number)
-    CleanupAndTerminate vbCrLf & "=== WARNING === Unknown employee: " & employeeName & " // normalized to: " & employeeName_Normalized & " // Not found in sheet2. Confirming without entering employee to SAP..."
+    Log vbCrLf & "=== WARNING === Unknown employee: " & employeeName & " // normalized to: " & employeeName_Normalized & " // Not found in sheet2. Confirming without entering employee to SAP..."
 End Function
 
 ' Normalizes a string for lenient comparison: lowercases, removes accents, removes spaces, removes doubled letters
