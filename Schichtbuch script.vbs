@@ -400,10 +400,10 @@ Sub initialize()
     ElseIf argUseCurrentExcel = "yes" Then
         Log "using current excel because argument useCurrentExcel=" & argUseCurrentExcel
         Dim monthNamesGerman, currentMonthGerman
-        monthNamesGerman = Array("Januar", "Februar", "März", "April", "Mai", "Juni", _
+        monthNamesGerman = Array("Januar", "Februar", "M" & Chr(228) & "rz", "April", "Mai", "Juni", _
             "Juli", "August", "September", "Oktober", "November", "Dezember")
         currentMonthGerman = monthNamesGerman(Month(Date) - 1)
-        filePath = "https://cargillonline.sharepoint.com/sites/mrdokumentenmanagement-2do/shared documents/2do/5 schichtbuch/" & currentMonthGerman & "_" & Year(Date) & "_Schichtbuch.xlsx"
+        filePath = "https://cargillonline.sharepoint.com/sites/mrdokumentenmanagement-2do/shared documents/2do/5 schichtbuch/" + currentMonthGerman + "_" & Year(Date) & "_Schichtbuch.xlsx"
         Log "using current excel path=" & filePath
     Else ' 
         Log "Showing file dialog so user can select Excel file..."
