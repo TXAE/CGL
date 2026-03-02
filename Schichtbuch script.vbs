@@ -16,7 +16,7 @@ onlyParse_rowsToInspect = False 'TRUE IF YOU ONLY WANT THE SCRIPT TO PARSE THROU
 
 ' === LOOP THROUGH ROWS ===
 Dim i, j, SkipReason, rowText, Tag, WO_Nr, Schicht, Standort, Mitarbeiter, Bemerkung, Fehlerbeschreibung, Massnahme, Startzeit, Endzeit, DauerInH, Status, emptyRowCounter, rowsToInspect, onlyParse_rowsToInspect
-For i = 2 To lastRow ' Assuming row 1 is header
+For i = 2 To lastRow+10 ' Assuming row 1 is header, iterate through 10 extra rows to check for emptiness at the end of the logbook
     ' Ensure status buffer exists to collect per-row messages (buffered write to Excel)
     If Not IsArray(g_statusBuffer) Then
         ReDim g_statusBuffer(lastRow)
@@ -448,7 +448,7 @@ Sub initialize()
     ' === FIND LAST ROW AND COLUMN ===
     lastRow = sheet1.Cells(sheet1.Rows.Count, 1).End( - 4162).Row ' -4162 = xlUp
     lastCol = sheet1.Cells(1, sheet1.Columns.Count).End( - 4159).Column ' -4159 = xlToLeft
-    'Log "lastRow in Excel workbook:" & lastRow
+    Log "lastRow in Excel workbook: " & lastRow & " // lastColumn in Excel workbook: " & lastCol
 
     ' --- disable screen updating and calculation while processing to speed up Excel operations
     'On Error Resume Next
