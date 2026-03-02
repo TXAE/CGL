@@ -41,7 +41,7 @@ For i = 2 To lastRow ' Assuming row 1 is header
         Endzeit = GetCellFromCache(sheet1_cached, i, 11)
         DauerInH = GetCellFromCache(sheet1_cached, i, 12)
         Status = GetCellFromCache(sheet1_cached, i, 15)
-
+        
         ' HARD skip conditions - no WO, already something in message column from a previous script execution or no status/cancelled
         If WO_Nr = "" Then
             SkipReason = SkipReason & vbCrLf & " - No WO found."
@@ -56,27 +56,47 @@ For i = 2 To lastRow ' Assuming row 1 is header
         If Status = "" Then
             SkipReason = SkipReason & vbCrLf & " - No 'Status' for WO " & WO_Nr & " found."
         ElseIf Status = cancelled_text_from_excel And SkipReason = "" Then
-            Log "Row " & i & " - WO " & WO_Nr & " is marked as cancelled in shift logbook. Proceeding to cancel in SAP..."
-            ' Cancel the WO in SAP
-            SafeStartTransaction "IW32"
-            SafeSetText "wnd[0]/usr/ctxtCAUFVD-AUFNR", WO_Nr
-            SafeSendVKey "wnd[0]", 0
-            ' Set User Status
-            SafePress "wnd[0]/usr/subSUB_ALL:SAPLCOIH:3001/ssubSUB_LEVEL:SAPLCOIH:1100/subSUB_KOPF:SAPLCOIH:1102/btn%#AUTOTEXT001"
-            ' Select CNCL Cancelled
-            SafeSetSelected "wnd[1]/usr/tblSAPLBSVATC_EO/chkJ_STMAINT-ANWSO[0,2]", True
-            SafeSendVKey "wnd[1]", 0 ' Enter
-            SafeSendVKey "wnd[0]", 11 ' CTRL+S saves the order
-            Check_if_WO_needs_TECO(wo_Nr)
-            Dim cancelled_msg : cancelled_msg = "WO cancelled in SAP."
-            SkipReason = SkipReason & vbCrLf & " - " & cancelled_msg
-            Log cancelled_msg
-            WriteToExcel i, column_in_excel_where_to_put_message, cancelled_msg, False
-            ' Performance improvement: - problem: when script faults, not all is written! :(
-            ' Buffer the write (will flush at the end). Also keep log output.
-            'g_statusBuffer(i) = cancelled_msg
+            Log "Row " & i & " - WO " & WO_Nr & " is marked as cancelled in shift logbook."
+            Dim cancel_response
+            If autoConfirmResponse = vbYes Then
+                cancel_response = vbYes
+            Else
+                cancel_response = MsgBox("Do you want to cancel WO " & wo_Nr & " in SAP?" & vbCrLf & vbCrLf & _
+                    "Yes:" & vbCrLf & _
+                    "will cancel the WO as you see it on your screen and proceed with the script." & vbCrLf & vbCrLf & _
+                    "No:" & vbCrLf & _
+                    "will NOT cancel the WO but proceed with the script" & vbCrLf & vbCrLf & _
+                    "Cancel:" & vbCrLf & _
+                    "will NOT cancel the WO and TERMINATE the script.", vbYesNoCancel + vbQuestion, "Cancel WO " & wo_Nr & " in SAP?")
+            End If
+            Select Case cancel_response
+                Case vbYes
+                    ' Cancel the WO in SAP
+                    SafeStartTransaction "IW32"
+                    SafeSetText "wnd[0]/usr/ctxtCAUFVD-AUFNR", WO_Nr
+                    SafeSendVKey "wnd[0]", 0
+                    ' Set User Status
+                    SafePress "wnd[0]/usr/subSUB_ALL:SAPLCOIH:3001/ssubSUB_LEVEL:SAPLCOIH:1100/subSUB_KOPF:SAPLCOIH:1102/btn%#AUTOTEXT001"
+                    ' Select CNCL Cancelled
+                    SafeSetSelected "wnd[1]/usr/tblSAPLBSVATC_EO/chkJ_STMAINT-ANWSO[0,2]", True
+                    SafeSendVKey "wnd[1]", 0 ' Enter
+                    SafeSendVKey "wnd[0]", 11 ' CTRL+S saves the order
+                    Check_if_WO_needs_TECO(wo_Nr)
+                    Dim msgAftercancel : msgAftercancel = "WO cancelled."
+                    If autoConfirmResponse = vbNo Then msgAftercancel = msgAftercancel & " because user requested to."
+                    Log msgAftercancel
+                    SkipReason = SkipReason & vbCrLf & " - " & msgAftercancel
+                    WriteToExcel i, column_in_excel_where_to_put_message, msgAftercancel, False
+                Case vbNo
+                    Log "WO " & wo_Nr & " not cancelled. User clicked no when asked to cancel, so I did not cancel. Proceeding with the script..."
+                Case vbCancel
+                    CleanupAndTerminate "WO " & wo_Nr & " not cancelled. User clicked cancel, so terminating script."
+            End Select
+            
+            
+
         End If
-        
+
         'SOFT skip conditions - missing data that is needed for confirmation
         If Mitarbeiter = "" Then
             SkipReason = SkipReason & vbCrLf & " - No employee for WO " & WO_Nr & " found."
@@ -105,7 +125,7 @@ For i = 2 To lastRow ' Assuming row 1 is header
                 EndzeitConvertToUTC = EndzeitConvertToUTC + 1 'make Endzeit one day later
             End If
         End If
-        
+
         If IsInArray(i, rowsToInspect) Then
             Log vbCrLf & _
                 "______________________________________________________________________________" & vbCrLf & _
@@ -120,8 +140,8 @@ For i = 2 To lastRow ' Assuming row 1 is header
                 "EndzeitConvertToUTC                : " & EndzeitConvertToUTC & vbCrLf
             'CleanupAndTerminate "Terminating due to reaching a row to inspect (debugging)..."
         End If
-        
 
+        
         If DauerInH = "" Then
             SkipReason = SkipReason & vbCrLf & " - No 'DauerInH' for WO " & WO_Nr & " found."
         Else
@@ -139,14 +159,14 @@ For i = 2 To lastRow ' Assuming row 1 is header
                 Log emptyRowsUntilDone & " empty rows detected."
                 If argUseCurrentExcel = "yes" And argAutoConfirm = "yes" Then
                     Log "argUseCurrentExcel = yes And argAutoConfirm = yes, so copying upcoming PMs to shift logbook..."
-
+                    
                     If SAP_plantcode = "" Then
                         SafeStartTransaction "IW33"
                         ' can use any WO to get to the plant code, so don't put any WO here - this will SAP use the last one
                         SafeSendVKey "wnd[0]", 0
                         SAP_plantcode = SafeGetText("wnd[0]/usr/subSUB_ALL:SAPLCOIH:3001/ssubSUB_LEVEL:SAPLCOIH:1100/tabsTS_1100/tabpIHKZ/ssubSUB_AUFTRAG:SAPLCOIH:1120/subHEADER:SAPLCOIH:0154/txtCAUFVD-IWERK")
                     End If
-                    
+
                     SafeStartTransaction "IW38"
                     Dim today, tomorrow, Basic_Start_Date_LOW, Basic_Start_Date_HIGH
                     today = Date
@@ -157,19 +177,19 @@ For i = 2 To lastRow ' Assuming row 1 is header
                     Else
                         Basic_Start_Date_HIGH = tomorrow
                     End If
-
+                    
                     SafeSetText "wnd[0]/usr/ctxtGSTRP-LOW", Basic_Start_Date_LOW ' Basic Start Date - LOW
                     SafeSetText "wnd[0]/usr/ctxtGSTRP-HIGH", Basic_Start_Date_HIGH ' Basic Start Date - HIGH
                     SafeSetText "wnd[0]/usr/ctxtDATUV", "" ' Period - LOW
                     SafeSetText "wnd[0]/usr/ctxtDATUB", "" ' Period - HIGH
                     SafeSetText "wnd[0]/usr/ctxtSWERK-LOW", SAP_plantcode
                     SafeSendVKey "wnd[0]", 8 ' Execute (F8)
-                    
+
                     Dim grid, rowCount, colCount, ord, r, c
                     Set grid = SafeFindById("wnd[0]/usr/cntlGRID1/shellcont/shell")
                     rowCount = grid.RowCount
                     'colCount = grid.ColumnCount
-
+                    
                     ' --- 1) Get the ColumnOrder as a collection of technical IDs ---
                     On Error Resume Next
                     Set ord = grid.ColumnOrder ' to get techId of column header (e.g. AUFNR = Order)
@@ -178,7 +198,7 @@ For i = 2 To lastRow ' Assuming row 1 is header
                         CleanupAndTerminate "This ALV does not expose ColumnOrder as a collection. Cannot proceed without tech IDs."
                     End If
                     On Error GoTo 0
-
+                    
                     ' --- 2) Build a map: techId -> visible index ---
                     Dim techToIdx : Set techToIdx = CreateObject("Scripting.Dictionary")
                     Dim colId
@@ -186,7 +206,7 @@ For i = 2 To lastRow ' Assuming row 1 is header
                         colId = ord.Item(c)
                         If Not techToIdx.Exists(colId) Then techToIdx.Add colId, c
                     Next
-
+                    
                     ' --- 3) Define the required fields and their Excel target columns ---
                     Dim wanted : Set wanted = CreateObject("Scripting.Dictionary")
                     '   tech id     -> Excel column index (example mapping; adjust as you need)
@@ -194,14 +214,14 @@ For i = 2 To lastRow ' Assuming row 1 is header
                     wanted.Add "AUFNR", 3 ' Order
                     wanted.Add "ZZTIDNR", 4 ' Technical IdentNo.
                     wanted.Add "KTEXT", 7 ' Description
-
+                    
                     ' --- 4) Validate the layout: all required tech IDs must exist ---
                     Dim missing : Set missing = CreateObject("Scripting.Dictionary")
                     Dim k
                     For Each k In wanted.Keys
                         If Not techToIdx.Exists(k) Then missing.Add k, True
                     Next
-
+                    
                     If missing.Count > 0 Then
                         Dim msg, key
                         msg = "Required column(s) missing in current IW38 layout: "
@@ -211,26 +231,26 @@ For i = 2 To lastRow ' Assuming row 1 is header
                         msg = msg & vbCrLf & "Please load the correct ALV layout (e.g., with technical names) and try again."
                         CleanupAndTerminate msg
                     End If
-
+                    
                     ' --- 5) Pre-locate the KTEXT column index (for skip-row check) ---
                     Dim ktextIdx
                     ktextIdx = techToIdx("KTEXT")
-
+                    
                     ' --- 6) Main loop: Skip rows where KTEXT contains "Indutec", else process wanted fields only ---
                     Dim row_factor_to_adust_for_skip : row_factor_to_adust_for_skip = 1
                     For r = 0 To rowCount - 1
                         ' Read KTEXT strictly by tech ID; aborts if not readable
                         value = GetCellValueStrict(grid, r, "KTEXT")
-                        
+
                         If InStr(value, "Indutec") = 0 Then
                             Dim row_in_excel_where_to_put : row_in_excel_where_to_put = i - emptyRowsUntilDone + row_factor_to_adust_for_skip + r
                             ' Process only the fields we want
                             For Each k In wanted.Keys
                                 Dim value, column_in_excel_where_to_put : column_in_excel_where_to_put = wanted(k)
-
+                                
                                 ' Read strictly by tech ID; aborts if not readable
                                 value = GetCellValueStrict(grid, r, k)
-
+                                
                                 If value <> "" Then
                                     Log "  Taking from SAP" & vbCrLf & _
                                         "  row: " & r & ", techId: " & k & ", value: " & value & vbCrLf & _
@@ -251,10 +271,10 @@ For i = 2 To lastRow ' Assuming row 1 is header
         Else
             emptyRowCounter = 0
         End If
-
-
+        
+        
         If SkipReason = "" Then
-            Log vbCrLf & "Checking row: " & i & " with the following content:" & vbCrLf & rowText
+            Log vbCrLf & "Checking row " & i & " with the following content:" & vbCrLf & rowText
             If Check_if_WO_needs_confirmation(WO_Nr) Then
                 Dim alleMitarbeiter, einzelnerMitarbeiter, confirmation, counter, total
                 alleMitarbeiter = Split(Mitarbeiter, "/")
@@ -309,41 +329,39 @@ CleanupAndTerminate "Finished."
 
 Sub initialize()
     Dim logFolder, scriptName, userName, dateTimeStamp
-    
+
     column_in_excel_where_to_put_message = 16
-    
+
     Set fso = CreateObject("Scripting.FileSystemObject")
-    
+
     ' Get script name without extension
     scriptName = fso.GetBaseName(WScript.ScriptFullName)
-    
+
     ' Get user name
     userName = CreateObject("WScript.Network").UserName
-    
+
     ' Format date and time for filename
     dateTimeStamp = Year(Now) & "_" & Right("0" & Month(Now), 2) & "_" & Right("0" & Day(Now), 2) & "-" & _
         Right("0" & Hour(Now), 2) & "_" & Right("0" & Minute(Now), 2)
-    
+
     ' Create the log folder path relative to the EXE location
     logFolder = fso.GetParentFolderName(WScript.ScriptFullName) & "\logs"
-    
-    If Not fso.FolderExists(logFolder) Then
-        fso.CreateFolder(logFolder)
-    End If
-    
+
+    If Not fso.FolderExists(logFolder) Then fso.CreateFolder(logFolder)
+
     ' Set the global log file path
     g_logFilePath = logFolder & "\" & scriptName & "_" & userName & "_" & dateTimeStamp & ".log"
-    
+
     Set logFile = fso.OpenTextFile(g_logFilePath, 8, True) ' 8 = ForAppending
     Log "Initialized."
     Log "WScript.ScriptFullName: " & WScript.ScriptFullName
     Log "LogFilePath: " & g_logFilePath
-    
-    
+
+
     argFilePath = GetArgValue("filePath")
     argAutoConfirm = GetArgValue("autoConfirm")
     argUseCurrentExcel = GetArgValue("useCurrentExcel")
-    
+
     ' Cache timezone bias once to avoid repeated registry reads during processing
     On Error Resume Next
     Dim sh
@@ -410,13 +428,13 @@ Sub initialize()
             End If
         Next
     End If
-    
+
     If Not workbookAlreadyOpen Then
         On Error Resume Next
         Set workbook = excelApp.Workbooks.Open(filePath)
         If Err.Number <> 0 Or workbook Is Nothing Then
             Err.Clear
-            CleanupAndTerminate "Fehler beim Öffnen der Datei: " & filePath & vbCrLf & _
+            CleanupAndTerminate "ERROR: Could not open workbook: " & filePath & vbCrLf & _
                 "Details: " & Err.Description
         End If
         Log "Opened: " & filePath
@@ -425,20 +443,20 @@ Sub initialize()
     Set sheet1 = workbook.sheets(1)
     Set sheet2 = workbook.sheets(2)
     Log "Shift logbook Excel file has " & workbook.sheets.Count & " sheets. sheet1 name: " & sheet1.Name & " // sheet2 name: " & sheet2.Name
-    
-    
+
+
     ' === FIND LAST ROW AND COLUMN ===
     lastRow = sheet1.Cells(sheet1.Rows.Count, 1).End( - 4162).Row ' -4162 = xlUp
     lastCol = sheet1.Cells(1, sheet1.Columns.Count).End( - 4159).Column ' -4159 = xlToLeft
     'Log "lastRow in Excel workbook:" & lastRow
-    
+
     ' --- disable screen updating and calculation while processing to speed up Excel operations
     'On Error Resume Next
     'prevScreenUpdating = excelApp.ScreenUpdating
     'prevCalculation = excelApp.Calculation
     'excelApp.ScreenUpdating = False
     'On Error GoTo 0
-    
+
     ' --- Performance improvement: cache Excel data once to variant 2D array
     ' Read the used range into memory (single COM call)
     sheet1_cached = Empty
@@ -448,10 +466,26 @@ Sub initialize()
     sheet2_cached = sheet2.Range(sheet2.Cells(1, 1), sheet2.Cells(lastRow, lastCol)).Value
     If Err.Number <> 0 Then CleanupAndTerminate "=== ERROR === Bulk read of sheet2 range failed."
     On Error GoTo 0
-    
+
+    If IsEmpty(sheet1_cached) Then
+        CleanupAndTerminate "ERROR: sheet1_cached is empty after bulk read from Excel. Please check that the shift logbook Excel file has data in the first sheet."
+    End If
+    If IsNull(sheet1_cached) Then
+        CleanupAndTerminate "ERROR: sheet1_cached is null after bulk read from Excel. Please check that the shift logbook Excel file has data in the first sheet."
+    End If
+    If IsEmpty(sheet2_cached) Then
+        CleanupAndTerminate "ERROR: sheet2_cached is empty after bulk read from Excel. Please check that the shift logbook Excel file has data in the second sheet."
+    End If
+    If IsNull(sheet2_cached) Then
+        CleanupAndTerminate "ERROR: sheet2_cached is null after bulk read from Excel. Please check that the shift logbook Excel file has data in the second sheet."
+    End If
+
     done_text_from_excel = sheet2_cached(4, 5) ' cell E4 in sheet2
     cancelled_text_from_excel = sheet2_cached(5, 5) ' cell E5 in sheet2
     Log "done_text_from_excel sheet2: '" & done_text_from_excel & "' // cancelled_text_from_excel sheet2: '" & cancelled_text_from_excel & "'"
+    If done_text_from_excel = "" Or cancelled_text_from_excel = "" Then
+        CleanupAndTerminate "ERROR: done_text_from_excel or cancelled_text_from_excel is empty. Please check that cells E4 and E5 in sheet2 of the shift logbook Excel file are filled with the correct text to indicate a done or cancelled WO in the excel."
+    End If
     
     Log vbCrLf & "Logging in to SAP..."
     loadedFromMainScript = True ' flag to indicate this script is calling the login script
@@ -460,7 +494,7 @@ Sub initialize()
     file.Close
     ExecuteGlobal code
     Set session = SAPLogin()
-    
+
     If argAutoConfirm = "yes" Then
         autoConfirmResponse = vbYes
     ElseIf argAutoConfirm = "no" Then
@@ -485,8 +519,8 @@ Function Check_if_WO_needs_confirmation(wo_Nr)
         WriteToExcel i, column_in_excel_where_to_put_message, returnValueFromSAP, False
         Exit Function
     End If
-    
 
+    
     Dim sysStatus : sysStatus = GetSysStatus()
     If InStr(sysStatus, "TECO") > 0 Then
         Log "WO " & wo_Nr & " already completed."
@@ -521,13 +555,13 @@ Function Confirm_WO(wo, mitarbeiter, dauerInStunden, startzeit, endzeit, massnah
         " End (UTC)         : " & endzeit & vbCrLf & _
         " What was done     : " & massnahme & vbCrLf & _
         " finalConfirmation?  " & finalConfirmation
-    
+
     SafeStartTransaction "IW41"
     ' enable Parameters > Goods movements > all components - see https://cargillonline.sharepoint.com/:i:/r/sites/SAPSUBERLIN/Shared%20Documents/Allgemeines/Anleitungen/Anwendung%20-%20Maintenance%20%26%20Reliability/Korrektive%20Instandhaltung%20(Currative%20Maintenance)/6_Arbeitszeitbest%C3%A4tigung%20(Time%20conformation)/Materialaustrag_Parameter-Einstellung.png
     SafeSendVKey "wnd[0]", 18 ' opens Parameters
     SafeSetSelected "wnd[1]/usr/chkTCORU-ACOMP", True ' ticks Goods movements > all components
     SafeSendVKey "wnd[1]", 0 ' enter
-    
+
     SafeSetText "wnd[0]/usr/ctxtCORUF-AUFNR", wo
     ' Set operation number from excel column Q
     Dim planned_operation_from_excel : planned_operation_from_excel = GetCellFromCache(sheet1_cached, i, 17) ' column Q = 17
@@ -538,10 +572,10 @@ Function Confirm_WO(wo, mitarbeiter, dauerInStunden, startzeit, endzeit, massnah
         Log "Setting operation number from excel column Q: " & planned_operation_from_excel
         SafeFindById("wnd[0]/usr/txtCORUF-VORNR").text = planned_operation_from_excel ' column Q = 17
     End If
-
+    
     SafeSendVKey "wnd[0]", 0 'enter
-    
-    
+
+
     Dim personnelNo, duration
     On Error Resume Next
     personnelNo = GetpersonnelNumber(mitarbeiter)
@@ -560,7 +594,7 @@ Function Confirm_WO(wo, mitarbeiter, dauerInStunden, startzeit, endzeit, massnah
     If Len(personnelNo) <> 8 Then
         Confirm_WO = "ERROR: personellNo: '" & personnelNo & "' is not 8 chars long."
     End If
-    
+
     SafeSetText "wnd[0]/usr/ctxtAFRUD-PERNR", personnelNo
     duration = ConvertTimeToDecimalHour(dauerInStunden)
     SafeSetText "wnd[0]/usr/txtAFRUD-ISMNW_2", duration ' Actual work
@@ -578,13 +612,13 @@ Function Confirm_WO(wo, mitarbeiter, dauerInStunden, startzeit, endzeit, massnah
     If SafeGetText("wnd[0]/sbar") <> "" Then
         CleanupAndTerminate "Unable to confirm WO - " & SafeGetText("wnd[0]/sbar")
     End If
-    
+
     If finalConfirmation Then
         SafeSetText "wnd[0]/usr/txtAFRUD-OFMNW_2", "0" ' Remaining work
         SafeSetSelected "wnd[0]/usr/chkAFRUD-AUERU", True ' Final confirmation
         SafeSetSelected "wnd[0]/usr/chkAFRUD-LEKNW", True ' No remaining work
     End If
-    
+
     Dim ConfirmationResponse
     If autoConfirmResponse = vbYes Then
         ConfirmationResponse = vbYes
@@ -603,8 +637,8 @@ Function Confirm_WO(wo, mitarbeiter, dauerInStunden, startzeit, endzeit, massnah
             SafeSendVKey "wnd[0]", 8 'F8 to open Goods movements overview
             SafeSendVKey "wnd[0]", 11 ' Saves the confirmation OR confirmation with goods movement
             'Confirm_WO = Confirm_WO & " // " & 'SafeFindById("wnd[0]/sbar").text ' attach return value from SAP confirmation number e.g. "Number of confirmations saved for order 417052748: 1"
-            Confirm_WO = "WO confirmed"
-
+            Confirm_WO = "confirmed"
+            
             'TODO: might get a warning from SAP here that ticking 'no remaining work' will set the remaining work field to zero. 
             'This happens e.g. when a WO is planned with 1hr, but only 0,5h was worked for it (e.g. 416100298). TODO guard against this
             If finalConfirmation Then
@@ -623,7 +657,7 @@ Function Check_if_WO_needs_TECO(wo_Nr)
     SafeStartTransaction "IW32"
     SafeSetText "wnd[0]/usr/ctxtCAUFVD-AUFNR", wo_Nr
     SafeSendVKey "wnd[0]", 0
-
+    
     Dim sysStatus : sysStatus = GetSysStatus()
     If InStr(sysStatus, "TECO") > 0 Then
         Log "WO " & wo_Nr & " already completed."
@@ -634,13 +668,13 @@ Function Check_if_WO_needs_TECO(wo_Nr)
         WriteToExcel i, column_in_excel_where_to_put_message, "WO " & wo_Nr & " already closed.", False
         Exit Function
     End If
-    
-    Dim CNF_Not_CAPR_response, orderText, objNetwork
+
+    Dim CNF_Not_CAPR_response, orderText
     orderText = SafeGetText("wnd[0]/usr/subSUB_ALL:SAPLCOIH:3001/ssubSUB_LEVEL:SAPLCOIH:1100/subSUB_KOPF:SAPLCOIH:1102/subSUB_TEXT:SAPLCOIH:1103/cntlLTEXT/shell")
     SafeSetText "wnd[0]/usr/subSUB_ALL:SAPLCOIH:3001/ssubSUB_LEVEL:SAPLCOIH:1100/subSUB_KOPF:SAPLCOIH:1102/subSUB_TEXT:SAPLCOIH:1103/cntlLTEXT/shell", _
         orderText & vbCr & vbCr & _
         "Completed by script executed by user " & username & " on " & Now & " using data from excel" & vbCr & filePath
-    
+
     If autoConfirmResponse = vbYes Then
         CNF_Not_CAPR_response = vbYes
     Else
@@ -656,13 +690,9 @@ Function Check_if_WO_needs_TECO(wo_Nr)
         Case vbYes
             SafeSendVKey "wnd[0]", 36 ' CTRL+F12
             SafeSendVKey "wnd[0]", 0 ' Enter
-
-            Dim msgAfterTECO
-            If autoConfirmResponse = vbYes Then
-                msgAfterTECO = "WO TECO'd."
-            Else
-                msgAfterTECO = "WO " & wo_Nr & " TECO'd because user requested to."
-            End If
+            
+            Dim msgAfterTECO : msgAfterTECO = "TECO'd"
+            If autoConfirmResponse = vbNo Then msgAfterTECO = msgAfterTECO & " because user requested to."
             Log msgAfterTECO
             Check_if_WO_needs_TECO = msgAfterTECO
         Case vbNo
@@ -684,7 +714,7 @@ Function GetSysStatus()
         Exit Function
     End If
     On Error GoTo 0 ' Turn back on default error handling
-
+    
     GetSysStatus = SafeGetText("wnd[0]/usr/subSUB_ALL:SAPLCOIH:3001/ssubSUB_LEVEL:SAPLCOIH:1100/subSUB_KOPF:SAPLCOIH:1102/txtCAUFVD-STTXT")
     Log "sysStatus of WO : " & GetSysStatus
 End Function
@@ -692,19 +722,20 @@ End Function
 Function GetpersonnelNumber(employeeName)
     Dim employeeName_Normalized
     employeeName_Normalized = NormalizeString(employeeName)
-    
+
     ' Search in sheet2_cached for matching employee name and return SAP personnel number
     Dim r, employeeName_in_sheet2_Normalized, employeeName_in_sheet2, personnelNo
-
-    If Not IsEmpty(sheet2_cached) And Not IsNull(sheet2_cached) Then
-        ' Iterate through sheet2_cached rows (starting from row 2, assuming row 1 is header)
-        For r = 2 To UBound(sheet2_cached, 1)
-            employeeName_in_sheet2 = GetCellFromCache(sheet2_cached, r, 1) ' Get name from column 1
-
+    
+    ' Iterate through sheet2_cached rows (starting from row 2, assuming row 1 is header)
+    For r = 2 To UBound(sheet2_cached, 1)
+        employeeName_in_sheet2 = GetCellFromCache(sheet2_cached, r, 1) ' Get name from column 1
+        If employeeName_in_sheet2 <> "" Then ' skip empty rows in sheet2
             ' Normalize the name from sheet2 the same way as the input
             employeeName_in_sheet2_Normalized = NormalizeString(employeeName_in_sheet2)
-            If employeeName_in_sheet2_Normalized = "" Then Exit For
-
+            If employeeName_in_sheet2_Normalized = "" Then
+                CleanupAndTerminate "ERROR: The normalization of " & employeeName_in_sheet2 & " (employee name in row " & r & " of sheet2) returned an empty string. This means that the name in sheet2 is not valid for comparison (e.g. it might contain only spaces or special characters). Please check the employee names in sheet2 of the shift logbook Excel file."
+            End If
+            'Log "Comparing employee name '" & employeeName & "' (normalized: '" & employeeName_Normalized & "') with sheet2 name '" & employeeName_in_sheet2 & "' (normalized: '" & employeeName_in_sheet2_Normalized & "')"
             ' Compare normalized names - allow lenient matching
             If CompareStringsLeniently(employeeName_Normalized, employeeName_in_sheet2_Normalized) Then
                 personnelNo = GetCellFromCache(sheet2_cached, r, 2) ' Get SAP personnel number from column 2 (=column B)
@@ -716,11 +747,11 @@ Function GetpersonnelNumber(employeeName)
                     CleanupAndTerminate "Employee '" & employeeName & "' found in sheet2, row " & r & " as '" & employeeName_in_sheet2 & "', but personnel number field is empty."
                 End If
             End If
-        Next
-    End If
-
+        End If
+    Next
+    
     ' If no match found in sheet2, log and return empty (don't confirm with personnel number)
-    Log vbCrLf & "=== WARNING === Unknown employee: " & employeeName & " // normalized to: " & employeeName_Normalized & " // Not found in sheet2. Confirming without entering employee to SAP..."
+    CleanupAndTerminate vbCrLf & "=== WARNING === Unknown employee: " & employeeName & " // normalized to: " & employeeName_Normalized & " // Not found in sheet2. Confirming without entering employee to SAP..."
 End Function
 
 ' Normalizes a string for lenient comparison: lowercases, removes accents, removes spaces, removes doubled letters
@@ -743,8 +774,11 @@ End Function
 ' Compares two strings leniently, returns True not only for exact matches but also with minimal character differences
 Function CompareStringsLeniently(string1, string2)
     CompareStringsLeniently = False
-    
     'Log "Comparing strings leniently: '" & string1 & "' vs. '" & string2 & "'"
+
+    ' Normalize case/whitespace
+    string1 = Trim(LCase(string1))
+    string2 = Trim(LCase(string2))
 
     ' Exact match
     If string1 = string2 Then
@@ -753,36 +787,29 @@ Function CompareStringsLeniently(string1, string2)
     End If
 
     ' Only compare if lengths are reasonably similar (within 2 characters)
-    Dim len1, len2, lengthDiff, maxLen, charDiff
+    Dim len1, len2, lengthDiff, maxLen, minLen, charDiff
     len1 = Len(string1)
     len2 = Len(string2)
 
     If len1 > len2 Then
         lengthDiff = len1 - len2
         maxLen = len1
+        minLen = len2
     Else
         lengthDiff = len2 - len1
+        minLen = len1
         maxLen = len2
     End If
 
-    ' Reject if length difference is too large (e.g., "nicostuijt" is 10 chars, "michelgroen" is 11 chars - too different)
-    If lengthDiff > 2 Then
-        Exit Function
-    End If
+    ' Reject if length difference is too large
+    If lengthDiff > 2 Then Exit Function
 
-    ' Only attempt lenient matching for reasonably long names
-    If maxLen < 5 Then
-        Exit Function
-    End If
+    ' Only attempt lenient matching for reasonably long names, otherwise risk of false positives is too high (e.g. "Tim" vs. "Tom")
+    If maxLen < 5 Then Exit Function
 
     ' Count character differences by comparing position by position
     charDiff = 0
-    Dim i, minLen
-    minLen = Len(string1)
-    If minLen > Len(string2) Then
-        minLen = Len(string2)
-    End If
-
+    Dim i
     For i = 1 To minLen
         If Mid(string1, i, 1) <> Mid(string2, i, 1) Then
             charDiff = charDiff + 1
@@ -826,15 +853,15 @@ End Function
 ' Converts Time like 01:30:00 (1 hour 30 minutes) to decimal hour like 1,5 hrs for SAP input
 Function ConvertTimeToDecimalHour(timeInput)
     Dim parts, hours, minutes, seconds
-    
+
     parts = Split(timeInput, ":")
-    
+
     hours = CInt(parts(0))
     minutes = CInt(parts(1))
     seconds = CInt(parts(2))
-    
+
     ConvertTimeToDecimalHour = hours + (minutes / 60) + (seconds / 3600)
-    
+
     ' Replace dot with comma for format settings
     ConvertTimeToDecimalHour = Replace(FormatNumber(ConvertTimeToDecimalHour, 2), ".", ",")
 End Function
@@ -847,30 +874,30 @@ Function ConvertExcelFractionToTime(excelTime)
         ConvertExcelFractionToTime = Null
         Exit Function
     End If
-    
+
     ' Check if it's a valid numeric value
     If Not IsNumeric(excelTime) Then
         Log "ExcelFractionToTime(" & excelTime & ") - parameter is not numeric"
         ConvertExcelFractionToTime = Null
         Exit Function
     End If
-    
+
     ' Convert to time if it's a fraction between 0 and 1
     If CDbl(excelTime) >= 0 And CDbl(excelTime) < 1 Then
-
-
+        
+        
         Dim totalSeconds, hours, minutes, seconds
-
+        
         ' Round total seconds to avoid truncation errors
         totalSeconds = Round(excelTime * 86400)
-
+        
         ' Calculate hours, minutes, seconds
         hours = totalSeconds \ 3600
         minutes = (totalSeconds Mod 3600) \ 60
         seconds = totalSeconds Mod 60
-
+        
         ConvertExcelFractionToTime = TimeSerial(hours, minutes, seconds)
-
+        
     Else
         Log "ExcelFractionToTime(" & excelTime & ") - parameter is not between 0 and 1"
         ConvertExcelFractionToTime = Null
@@ -880,21 +907,21 @@ End Function
 ' Converts DateTime like "21.08.2025 01:30:00" safely to Date format. Returns Null if conversion fails
 Function SafeCDate(value)
     Dim result
-    
+
     ' Check for empty or null input
     If IsNull(value) Or Trim(CStr(value)) = "" Then
         Log "SafeCDate(" & value & ") - parameter is null or empty"
         SafeCDate = Null
         Exit Function
     End If
-    
+
     ' Check if it's numeric or date
     If Not IsNumeric(value) And Not IsDate(value) Then
         Log "SafeCDate(" & value & ") - parameter is not numeric and not a date"
         SafeCDate = Null
         Exit Function
     End If
-    
+
     ' Try converting full date-time string
     On Error Resume Next
     SafeCDate = CDate(value)
@@ -911,7 +938,7 @@ Function SafeCellAccess(sheet, row, column)
     If row < 1 Or column < 1 Then
         CleanupAndTerminate "ERRROR: Function SafeCellAccess(sheetName=" & sheet.Name & " & row=" & row & ", column=" & column & ") failed because row or column or both are < 1."
     End If
-    
+
     On Error Resume Next
     Dim val
     val = sheet.Cells(row, column).Value
@@ -939,19 +966,19 @@ Function TrimAfterComma(inputStr)
     'MsgBox trimmed  ' Output: 123,4
     Dim parts, result
     parts = Split(inputStr, ",")
-    
+
     If UBound(parts) = 0 Then
         result = inputStr ' No comma found
     Else
         result = parts(0) & "," & Left(parts(1), 1)
     End If
-    
+
     TrimAfterComma = result
 End Function
 
 Function ConvertToUTC(inputDate)
     On Error Resume Next
-    
+
     Dim bias, utcDate
     ' Use cached timezone bias if available (set in initialize())
     If Not IsEmpty(g_timezoneBias) And g_timezoneBias <> "" Then
@@ -967,14 +994,14 @@ Function ConvertToUTC(inputDate)
             Exit Function
         End If
     End If
-    
+
     ' Validate inputTime
     If Not IsDate(inputDate) Then
         Log "ConvertToUTC(" & inputDate & ") - Invalid input: not a valid date/time."
         ConvertToUTC = inputDate
         Exit Function
     End If
-    
+
     ' Convert to UTC using minutes bias
     utcDate = DateAdd("n", bias, inputDate)
     If Err.Number <> 0 Then
@@ -983,7 +1010,7 @@ Function ConvertToUTC(inputDate)
         Err.Clear
         Exit Function
     End If
-    
+
     ConvertToUTC = utcDate
     On Error GoTo 0
 End Function
@@ -1019,25 +1046,25 @@ Sub WriteToExcel(row, column, message, redBackgroundAndBoldText)
     If IsEmpty(sheet1) Or IsNull(sheet1) Then
         CleanupAndTerminate "ERROR: Sub WriteToExcel(row=" & row & ", column=" & column & ", message=" & message & ", redBackgroundAndBoldText=" & redBackgroundAndBoldText & ") failed because sheet1 is not initialized."
     End If
-    
+
     On Error Resume Next
     ' Check if sheet1 is protected
     If sheet1.ProtectContents Or sheet1.ProtectDrawingObjects Or sheet1.ProtectScenarios Then
         CleanupAndTerminate "ERROR: Sub WriteToExcel(row=" & row & ", message=" & message & ", redBackgroundAndBoldText=" & redBackgroundAndBoldText & ") failed: sheet1 is protected."
     End If
-
+    
     If Not IsNull(redBackgroundAndBoldText) And redBackgroundAndBoldText = True Then
         sheet1.Cells(row, column).Interior.Color = RGB(255, 0, 0) ' Red background for error messages
         sheet1.Cells(row, column).Font.Bold = True ' Bold font for error messages
     End If
-    
+
     Dim existingValue : existingValue = SafeCellAccess(sheet1, row, column)
     If existingValue = "" Then
         sheet1.Cells(row, column).Value = message
     Else
         Log "WARNING! Not overwriting existing value in Excel at row " & row & ", column " & column & ". Existing value: '" & existingValue & "'"
     End If
-
+    
     ' Check for error
     If Err.Number <> 0 Then
         Log "Write failed: " & Err.Description
@@ -1060,7 +1087,7 @@ Function GetCellFromCache(sheet_cached, r, c)
         End If
     End If
     On Error GoTo 0
-    
+
     ' Normalize output similar to previous SafeValue behaviour
     If IsNull(rawVal) Or IsEmpty(rawVal) Then
         GetCellFromCache = ""
@@ -1086,19 +1113,19 @@ End Function
 ' Falls back to cell-by-cell access when no cache is available.
 Function IsCachedRowEmpty(rowIndex)
     Dim c, cellVal
-    
+
     ' Validate row index
     If rowIndex < 1 Then
         IsCachedRowEmpty = True
         Exit Function
     End If
-    
+
     ' If lastCol is not set, try to determine it conservatively
     If IsEmpty(lastCol) Or lastCol = 0 Then
         IsCachedRowEmpty = True
         Exit Function
     End If
-    
+
     For c = 1 To lastCol
         cellVal = GetCellFromCache(sheet1_cached, rowIndex, c)
         If cellVal <> "" Then
@@ -1106,7 +1133,7 @@ Function IsCachedRowEmpty(rowIndex)
             Exit Function
         End If
     Next
-    
+
     IsCachedRowEmpty = True
 End Function
 
@@ -1139,7 +1166,7 @@ End Function
 Function Timestamp()
     Dim t
     t = Timer ' e.g., 45296.234
-    
+
     Dim hours, minutes, seconds, milliseconds
     hours = Int(t \ 3600)
     minutes = Int((t Mod 3600) \ 60)
@@ -1155,7 +1182,7 @@ End Function
 Function Check_if_WO_contains_skip_condition()
     Check_if_WO_contains_skip_condition = False
     If SAP_plantcode = "" Then SAP_plantcode = SafeGetText("wnd[0]/usr/subSUB_ALL:SAPLCOIH:3001/ssubSUB_LEVEL:SAPLCOIH:1100/tabsTS_1100/tabpIHKZ/ssubSUB_AUFTRAG:SAPLCOIH:1120/subHEADER:SAPLCOIH:0154/txtCAUFVD-IWERK")
-
+    
     Log "Checking if WO contains skip condition for the script..."
     Log "1. skip condition: checking if WO has more than one operation in SAP but no planned operation in shift logbook excel."
     Log "   Checking operations tab in SAP for more than one operation..."
@@ -1202,15 +1229,15 @@ Function Check_if_WO_contains_skip_condition()
                 Log "   Planned operation '" & planned_operation_from_excel & "' provided in excel has operation short text '" & operation_short_text_in_SAP_WO & "' in SAP WO. Continuing script..."
             End If
         End If
-
+        
     End If
     Log "1. skip condition looks good. Next checking..."
     Log "2. skip condition: at least one purchase. Browsing document flow..."
     SafeSendVKey "wnd[0]", 35 'CTRL+F11 (Document Flow)
-    
+
     Dim tree, index, key, itemText
     Set tree = SafeFindById("wnd[0]/usr/shell/shellcont[1]/shell[1]")
-    
+
     index = 1
     Do
         key = Right(Space(11) & index, 11) ' Pad index to 11 characters
@@ -1227,9 +1254,9 @@ Function Check_if_WO_contains_skip_condition()
             Exit Do
         End If
         On Error GoTo 0
-
+        
         Log "   " & index & " => " & itemText
-
+        
         If InStr(itemText, "Purchase") > 0 Then
             Dim NotificationMessage : NotificationMessage = "Found: " & itemText & vbCrLf & "in work order, therefore script ignoring this work order."
             WriteToExcel i, column_in_excel_where_to_put_message, NotificationMessage, True
@@ -1237,7 +1264,7 @@ Function Check_if_WO_contains_skip_condition()
             Check_if_WO_contains_skip_condition = True
             Exit Do
         End If
-
+        
         index = index + 1
     Loop
     SafeSendVKey "wnd[0]", 3 ' F3 to go back from document flow to WO in SAP GUI
@@ -1250,7 +1277,7 @@ Function SafeFindById(objectPath)
     On Error Resume Next
     Dim obj
     Set obj = session.findById(objectPath)
-    
+
     If Err.Number <> 0 Or obj Is Nothing Then
         Dim errorMsg
         errorMsg = "CRITICAL ERROR: SAP session object not found!" & vbCrLf & vbCrLf & _
@@ -1264,7 +1291,7 @@ Function SafeFindById(objectPath)
             "Terminating script..."
         CleanupAndTerminate errorMsg
     End If
-    
+
     On Error GoTo 0
     Set SafeFindById = obj
 End Function
@@ -1413,12 +1440,12 @@ Sub CleanupAndTerminate(LastMessageToUser)
     ' === CLEANUP ===
     'workbook.Close False 'otherwise might fail at workbook.Close False e.g. when the file was not found
     'excelApp.Quit
-    
+
     Set sheet1 = Nothing
     Set sheet2 = Nothing
     Set workbook = Nothing
     Set excelApp = Nothing
-    
+
     Log LastMessageToUser
     logFile.Close
     WScript.Quit
