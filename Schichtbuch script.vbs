@@ -637,18 +637,19 @@ Function Confirm_WO(wo, mitarbeiter, dauerInStunden, startzeit, endzeit, massnah
             SafeSendVKey "wnd[0]", 11 ' Saves the confirmation OR confirmation with goods movement
             'Confirm_WO = Confirm_WO & " // " & 'SafeFindById("wnd[0]/sbar").text ' attach return value from SAP confirmation number e.g. "Number of confirmations saved for order 417052748: 1"
             Confirm_WO = "confirmed"
-            
-            'TODO: might get a warning from SAP here that ticking 'no remaining work' will set the remaining work field to zero. 
-            'This happens e.g. when a WO is planned with 1hr, but only 0,5h was worked for it (e.g. 416100298). TODO guard against this
-            If finalConfirmation Then
-                WScript.Sleep 500 ' hate to be doing this, but SAP can still be working on this work order after the script confirmed it (i.e. when there are goods movements), so waiting here to not error out bc work order is still being processed 
-                Confirm_WO = Confirm_WO & " // " & Check_if_WO_needs_TECO(wo)
-            End If
         Case vbNo
             Confirm_WO = "user clicked no when asked whether to confirm WO " & wo & ". Not confirming, but proceeding with the script..."
         Case vbCancel
             CleanupAndTerminate "user clicked cancel when asked whether to confirm WO " & wo & ". Not confirming and terminating the script."
     End Select
+    If ConfirmationResponse = vbYes Or ConfirmationResponse = vbNo Then
+        'TODO: might get a warning from SAP here that ticking 'no remaining work' will set the remaining work field to zero. 
+        'This happens e.g. when a WO is planned with 1hr, but only 0,5h was worked for it (e.g. 416100298). TODO guard against this
+        If finalConfirmation Then
+            WScript.Sleep 500 ' hate to be doing this, but SAP can still be working on this work order after the script confirmed it (i.e. when there are goods movements), so waiting here to not error out bc work order is still being processed 
+            Confirm_WO = Confirm_WO & " // " & Check_if_WO_needs_TECO(wo)
+        End If
+    End If
     Log "Confirm_WO " & wo_Nr & " returned: " & Confirm_WO
 End Function
 
