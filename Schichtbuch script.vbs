@@ -763,10 +763,10 @@ Function NormalizeString(inputStr)
     NormalizeString = LCase(NormalizeString) ' ignore capitalization
     NormalizeString = Replace(NormalizeString, " ", "") ' remove spaces
     NormalizeString = Replace(NormalizeString, "-", "") ' remove hyphens
-    NormalizeString = Replace(NormalizeString, "ä", "ae")
-    NormalizeString = Replace(NormalizeString, "ö", "oe")
-    NormalizeString = Replace(NormalizeString, "ü", "ue")
-    NormalizeString = Replace(NormalizeString, "ß", "s")
+    NormalizeString = Replace(NormalizeString, ChrW(&H00E4), "ae") ' replace ä with ae
+    NormalizeString = Replace(NormalizeString, ChrW(&H00F6), "oe") ' replace ö with oe
+    NormalizeString = Replace(NormalizeString, ChrW(&H00FC), "ue") ' replace ü with ue
+    NormalizeString = Replace(NormalizeString, ChrW(&H00DF), "s") ' replace ß with s
     NormalizeString = Replace(NormalizeString, "tzt", "tz")
     NormalizeString = Replace(NormalizeString, "zt", "tz")
     NormalizeString = Replace(NormalizeString, "schp", "sp")
