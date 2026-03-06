@@ -34,11 +34,7 @@ session.findById("wnd[0]").sendVKey 8 ' Execute (F8)
 session.findById("wnd[0]").sendVKey 31 ' Mail Recipient (CTRL+F7)
 session.findById("wnd[0]/usr/subSENDSCREEN:SAPLSO04:1020/subOBJECT:SAPLSO33:2300/tabsSO33_TAB1/tabpTAB1/ssubSUB1:SAPLSO33:2100/cntlEDITOR/shellcont/shell").text = _
     "Hallo Marco," + vbCr + "" + vbCr + "Nataliya wollte, dass Du jeden Freitag um 10 Uhr diese Liste mit den automatischen (vom SAP-System angefragten) Bestellungen der letzten Woche bekommst." + vbCr + _
-    "Diese Liste wird automatisch generiert und Dir auch automatisch mithilfe eines Skriptes versandt." + vbCr + "" + vbCr + "Geniess Dein Wochenende!" + vbCr + "Daniel Hermes"
-
-session.findById("wnd[0]/usr/subSENDSCREEN:SAPLSO04:1020/subRECLIST:SAPLSO04:0103/tabsTAB_CONTROL/tabpREC/ssubSUB1:SAPLSO04:0150/tblSAPLSO04REC_CONTROL/ctxtSOS04-L_ADR_NAME[0,0]").text = "M245834" ' Marco Ruhland
-session.findById("wnd[0]/usr/subSENDSCREEN:SAPLSO04:1020/subRECLIST:SAPLSO04:0103/tabsTAB_CONTROL/tabpREC/ssubSUB1:SAPLSO04:0150/tblSAPLSO04REC_CONTROL/ctxtSOS04-L_ADR_NAME[0,1]").text = "n736374" ' Nataliya Hristova
-session.findById("wnd[0]/usr/subSENDSCREEN:SAPLSO04:1020/subRECLIST:SAPLSO04:0103/tabsTAB_CONTROL/tabpREC/ssubSUB1:SAPLSO04:0150/tblSAPLSO04REC_CONTROL/ctxtSOS04-L_ADR_NAME[0,2]").text = "f699011" ' Fabian Erdmann
-session.findById("wnd[0]/usr/subSENDSCREEN:SAPLSO04:1020/subRECLIST:SAPLSO04:0103/tabsTAB_CONTROL/tabpREC/ssubSUB1:SAPLSO04:0150/tblSAPLSO04REC_CONTROL/ctxtSOS04-L_ADR_NAME[0,3]").text = "g650208" ' George-Pierre Bulus
+    "Diese Liste wird automatisch generiert und Dir auch automatisch mithilfe eines Skriptes versandt." + vbCr + "" + vbCr + "Geniess Dein Wochenende!" + vbCr + "Daniel"
+session.findById("wnd[0]/usr/subSENDSCREEN:SAPLSO04:1020/subRECLIST:SAPLSO04:0103/tabsTAB_CONTROL/tabpREC/ssubSUB1:SAPLSO04:0150/tblSAPLSO04REC_CONTROL/ctxtSOS04-L_ADR_NAME[0,0]").text = "d363973" '
 session.findById("wnd[0]").sendVKey 0 'enter
 session.findById("wnd[0]").sendVKey 20 ' Send... (Shift+F8)
