@@ -84,7 +84,7 @@ For i = 2 To lastRow + 10 ' Assuming row 1 is header, iterate through 10 extra r
                         SafeSendVKey "wnd[1]", 0 ' Enter
                         SafeSendVKey "wnd[0]", 11 ' CTRL+S saves the order
                         Check_if_WO_needs_TECO(wo_Nr)
-                        Dim msgAftercancel : msgAftercancel = "WO cancelled."
+                        Dim msgAftercancel : msgAftercancel = "Cancelled."
                         If autoConfirmResponse = vbNo Then msgAftercancel = msgAftercancel & " because user requested to."
                         Log msgAftercancel
                         SkipReason = SkipReason & vbCrLf & " - " & msgAftercancel
