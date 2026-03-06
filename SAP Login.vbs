@@ -303,7 +303,7 @@ End Function
 Sub WaitForWindow(WindowTitle)
     Dim startTime, elapsedTime, timeoutInMilliseconds
     Dim activeTitle, psCode
-    timeoutInMilliseconds = 9000
+    timeoutInMilliseconds = 10000
     startTime = Timer
     
     Do While True
