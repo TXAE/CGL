@@ -670,7 +670,11 @@ Function Check_if_WO_needs_TECO(wo_Nr)
         WriteToExcel i, column_in_excel_where_to_put_message, "WO " & wo_Nr & " already closed.", False
         Exit Function
     End If
-    If Check_if_WO_contains_skip_condition() Then Exit Function
+    Dim skipReason : skipReason = Check_if_WO_contains_skip_condition()
+    If skipReason <> "" Then
+        Check_if_WO_needs_TECO = SkipReason
+        Exit Function
+    End If
 
     Dim CNF_Not_CAPR_response, orderText
     orderText = SafeGetText("wnd[0]/usr/subSUB_ALL:SAPLCOIH:3001/ssubSUB_LEVEL:SAPLCOIH:1100/subSUB_KOPF:SAPLCOIH:1102/subSUB_TEXT:SAPLCOIH:1103/cntlLTEXT/shell")
@@ -1178,12 +1182,12 @@ Function Timestamp()
     timestamp = Right("0" & hours, 2) & ":" & Right("0" & minutes, 2) & ":" & Right("0" & seconds, 2) & "." & Right("00" & milliseconds, 3)
 End Function
 
-' Checks if a WO contains a skip condition. Returns False if no skip condition in WO, true if at least one skip condition in WO. 
+' Checks if a WO contains a skip condition. Returns an empty string ("") if no skip condition in WO, some string describing the 1st skip condition found if at least one skip condition in WO. 
 ' Prerequisite: Need to have work order open in SAP (Tcode IW32 for example)
 ' skip conditions are:
 ' any purchase or (more than one planned operation in SAP - so Operation 0020 - BUT NO PLANNED OPERATION PROVIDED IN EXCEL for logging work on)
 Function Check_if_WO_contains_skip_condition()
-    Check_if_WO_contains_skip_condition = False
+    Check_if_WO_contains_skip_condition = ""
     If SAP_plantcode = "" Then SAP_plantcode = SafeGetText("wnd[0]/usr/subSUB_ALL:SAPLCOIH:3001/ssubSUB_LEVEL:SAPLCOIH:1100/tabsTS_1100/tabpIHKZ/ssubSUB_AUFTRAG:SAPLCOIH:1120/subHEADER:SAPLCOIH:0154/txtCAUFVD-IWERK")
     
     Log "Checking if WO contains skip condition for the script..."
@@ -1205,7 +1209,7 @@ Function Check_if_WO_contains_skip_condition()
             'Log "   " & ERROR_MESSAGE_no_planned_operation_provided_in_excel
             'WriteToExcel i, column_in_excel_where_to_put_message, ERROR_MESSAGE_no_planned_operation_provided_in_excel, True
             'WriteToExcel i, column_in_excel_where_to_put_message + 1, "", True ' make cell where operation is supposed to be entered also red background to show user what is missing
-            'Check_if_WO_contains_skip_condition = True
+            'Check_if_WO_contains_skip_condition = ERROR_MESSAGE_no_planned_operation_provided_in_excel
             'Exit Function
         Else
             'Log "   Planned operation " & planned_operation_from_excel & " provided in excel for logging work on."
@@ -1226,7 +1230,7 @@ Function Check_if_WO_contains_skip_condition()
                 Log "   " & ERROR_MESSAGE_planned_operation_from_excel_has_no_short_text_in_SAP_WO
                 WriteToExcel i, column_in_excel_where_to_put_message, ERROR_MESSAGE_planned_operation_from_excel_has_no_short_text_in_SAP_WO, True
                 WriteToExcel i, column_in_excel_where_to_put_message + 1, "", True ' make cell with wrong operation also red background to show user what is wrong
-                Check_if_WO_contains_skip_condition = True
+                Check_if_WO_contains_skip_condition = ERROR_MESSAGE_planned_operation_from_excel_has_no_short_text_in_SAP_WO
                 Exit Function
             Else
                 Log "   Planned operation '" & planned_operation_from_excel & "' provided in excel has operation short text '" & operation_short_text_in_SAP_WO & "' in SAP WO. Continuing script..."
@@ -1261,10 +1265,9 @@ Function Check_if_WO_contains_skip_condition()
         Log "   " & index & " => " & itemText
         
         If InStr(itemText, "Purchase") > 0 Then
-            Dim NotificationMessage : NotificationMessage = "Found: " & itemText & vbCrLf & "in work order, therefore script ignoring this work order."
-            WriteToExcel i, column_in_excel_where_to_put_message, NotificationMessage, True
+            Dim NotificationMessage : NotificationMessage = "Found: " & itemText & vbCrLf & "in work order, therefore script not TECOing this work order."
             Log NotificationMessage
-            Check_if_WO_contains_skip_condition = True
+            Check_if_WO_contains_skip_condition = NotificationMessage
             Exit Do
         End If
         
