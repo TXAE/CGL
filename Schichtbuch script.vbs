@@ -163,6 +163,7 @@ For i = 2 To lastRow + 10 ' Assuming row 1 is header, iterate through 10 extra r
                     If SAP_plantcode = "" Then
                         SafeStartTransaction "IW33"
                         ' can use any WO to get to the plant code, so don't put any WO here - this will SAP use the last one
+                        ' TODO: Fails if no WO was opened in this SAP session before. In that case, maybe we can read the plant code from the first few rows in Excel and then search for a WO of that plant code to open here?
                         SafeSendVKey "wnd[0]", 0
                         SAP_plantcode = SafeGetText("wnd[0]/usr/subSUB_ALL:SAPLCOIH:3001/ssubSUB_LEVEL:SAPLCOIH:1100/tabsTS_1100/tabpIHKZ/ssubSUB_AUFTRAG:SAPLCOIH:1120/subHEADER:SAPLCOIH:0154/txtCAUFVD-IWERK")
                     End If
@@ -579,21 +580,13 @@ Function Confirm_WO(wo, mitarbeiter, dauerInStunden, startzeit, endzeit, massnah
     On Error Resume Next
     personnelNo = GetpersonnelNumber(mitarbeiter)
     If Err.Number <> 0 Then
-        Confirm_WO = "ERROR: " & Err.Description & vbCrLf & "Personell no. field not found by ID. WO: '" & wo_Nr & "' might have >1 operations planned with different work centers - example WO 416061308. Suggesting you manually do the confirmation."
+        Confirm_WO = "ERROR from function GetpersonnelNumber(" & mitarbeiter & "): " & Err.Description
         Log "Confirm_WO(" & wo_Nr & "): " & vbCrLf & Confirm_WO
-        'Dim errorResponse
-        'errorResponse = MsgBox(Confirm_WO, vbOKCancel + vbQuestion)
-        'If errorResponse = vbCancel Then
-        '    CleanupAndTerminate "user clicked cancel. Error was: " & Confirm_WO
-        'End If
         Err.Clear
         Exit Function
     End If
     On Error GoTo 0 ' Turn back on default error handling
-    If Len(personnelNo) <> 8 Then
-        Confirm_WO = "ERROR: personellNo: '" & personnelNo & "' is not 8 chars long."
-    End If
-
+    
     SafeSetText "wnd[0]/usr/ctxtAFRUD-PERNR", personnelNo
     duration = ConvertTimeToDecimalHour(dauerInStunden)
     SafeSetText "wnd[0]/usr/txtAFRUD-ISMNW_2", duration ' Actual work
@@ -748,6 +741,7 @@ Function GetpersonnelNumber(employeeName)
                 personnelNo = GetCellFromCache(sheet2_cached, r, 2) ' Get SAP personnel number from column 2 (=column B)
                 If personnelNo <> "" Then
                     Log "Employee '" & employeeName & "' found in sheet2, row " & r & " as '" & employeeName_in_sheet2 & "', mapped to personnel number from sheet2: " & personnelNo
+                    If Len(personnelNo) <> 8 Then CleanupAndTerminate "ERROR: personellNo: '" & personnelNo & "' is not 8 chars long."
                     GetpersonnelNumber = personnelNo
                     Exit Function
                 Else
