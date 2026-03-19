@@ -83,9 +83,10 @@ For i = 2 To lastRow + 10 ' Assuming row 1 is header, iterate through 10 extra r
                         SafeSetSelected "wnd[1]/usr/tblSAPLBSVATC_EO/chkJ_STMAINT-ANWSO[0,2]", True
                         SafeSendVKey "wnd[1]", 0 ' Enter
                         SafeSendVKey "wnd[0]", 11 ' CTRL+S saves the order
+                        Dim msgAftercancel : msgAftercancel = "Cancelled"
+                        If autoConfirmResponse = vbNo Then msgAftercancel = msgAftercancel & " because user requested to"
                         Dim needs_TECO : needs_TECO = Check_if_WO_needs_TECO(wo_Nr)
-                        Dim msgAftercancel : msgAftercancel = "Cancelled // " & needs_TECO
-                        If autoConfirmResponse = vbNo Then msgAftercancel = msgAftercancel & " because user requested to."
+                        If needs_TECO <> "" Then msgAftercancel = msgAftercancel & " // " & needs_TECO
                         Log msgAftercancel
                         SkipReason = SkipReason & vbCrLf & " - " & msgAftercancel
                         WriteToExcel i, column_in_excel_where_to_put_message, msgAftercancel, False
@@ -538,12 +539,13 @@ Function Check_if_WO_is_ready_for_script(wo_Nr)
         Exit Function
     End If
     If InStr(sysStatus, "REL ") > 0 And InStr(sysStatus, "RELR") = 0 Then ' released (REL) & NOT release rejected (RELR) & NOT technically completed (not TECO) & NOT Confirmed (not CNF)
-        Log "WO " & wo_Nr & " released (REL) & NOT technically completed (not TECO) & NOT Confirmed (not CNF). WO needs confirmation..."
+        Log "WO " & wo_Nr & " released (REL) & NOT technically completed (not TECO) & NOT Confirmed (not CNF)."
     Else
-        Log "WO " & wo_Nr & " NOT yet released (but also neither confirmed nor complete). Releasing WO now... WO needs confirmation after that..."
+        Log "WO " & wo_Nr & " NOT yet released (but also neither confirmed nor complete). Releasing WO now..."
         SafeSendVKey "wnd[0]", 25 ' CTRL+F1 releases the order
         SafeSendVKey "wnd[0]", 11 ' CTRL+S saves the order
     End If
+    Log "WO " & wo_Nr & " ready for script."
     Check_if_WO_is_ready_for_script = True
 End Function
 
@@ -692,7 +694,7 @@ Function Check_if_WO_needs_TECO(wo_Nr)
             SafeSendVKey "wnd[0]", 0 ' Enter
             
             Dim msgAfterTECO : msgAfterTECO = "TECO'd"
-            If autoConfirmResponse = vbNo Then msgAfterTECO = msgAfterTECO & " because user requested to."
+            If autoConfirmResponse = vbNo Then msgAfterTECO = msgAfterTECO & " because user requested to"
             Log msgAfterTECO
             Check_if_WO_needs_TECO = msgAfterTECO
         Case vbNo
