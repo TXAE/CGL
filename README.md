@@ -85,13 +85,13 @@ This VBScript scans the [**shift logbook excel**](Muster_2026_Schichtbuch.xlsx),
    - [`SAP Login.vbs`](SAP%20Login.vbs)
 2. Ensure folder is writable (script creates `./logs/`)
 3. Ensure SAP GUI scripting is enabled:
-   ![how_to_enable_scripting_in_SAP.png](how_to_enable_scripting_in_SAP.png)
+   ![how_to_enable_scripting_in_SAP.png](Resources/how_to_enable_scripting_in_SAP.png)
 4. Ensure graphical PC editor is disabled:
    In SAP IW41 Tcode, open any work order to confirm and click on 'long text'
    Click Goto. Then Configure Editor. Disable Graphical PC Editor.
 5. Run the script
    - from [command-line](#command-line-usage) or
-   - import the [windows task](shift%20logbook%20script%20windows%20task.xml) to the windows task scheduler to let the script run automatically (e.g. every day at 2PM)
+   - import the [windows task](Resources/shift%20logbook%20script%20windows%20task.xml) to the windows task scheduler to let the script run automatically (e.g. every day at 2PM)
 
 ---
 
