@@ -17,14 +17,6 @@ onlyParse_rowsToInspect = False 'TRUE IF YOU ONLY WANT THE SCRIPT TO PARSE THROU
 ' === LOOP THROUGH ROWS ===
 Dim i, j, SkipReason, rowText, Shift_Start_Date, WO_Nr, Mitarbeiter, Massnahme, DauerInH, Status, emptyRowCounter, rowsToInspect, onlyParse_rowsToInspect
 For i = 2 To lastRow ' Assuming row 1 is header
-    ' Ensure status buffer exists to collect per-row messages (buffered write to Excel)
-    If Not IsArray(g_statusBuffer) Then
-        ReDim g_statusBuffer(lastRow)
-        Dim idxInit
-        For idxInit = 0 To lastRow
-            g_statusBuffer(idxInit) = ""
-        Next
-    End If
     If Not onlyParse_rowsToInspect Or IsInArray(i, rowsToInspect) Then
         SkipReason = ""
         rowText = ""
@@ -74,116 +66,6 @@ For i = 2 To lastRow ' Assuming row 1 is header
             emptyRowCounter = emptyRowCounter + 1
             Log "Row " & i & " detected as empty row. emptyRowCounter: " & emptyRowCounter
             If emptyRowCounter = emptyRowsUntilDone Then
-                Log emptyRowsUntilDone & " empty rows detected."
-                If argUseCurrentExcel = "yes" And argAutoConfirm = "yes" Then
-                    Log "argUseCurrentExcel = yes And argAutoConfirm = yes, so copying upcoming PMs to shift logbook..."
-
-                    If SAP_plantcode = "" Then
-                        SafeStartTransaction "IW33"
-                        ' can use any WO to get to the plant code, so don't put any WO here - this will SAP use the last one
-                        SafeSendVKey "wnd[0]", 0
-                        SAP_plantcode = SafeGetText("wnd[0]/usr/subSUB_ALL:SAPLCOIH:3001/ssubSUB_LEVEL:SAPLCOIH:1100/tabsTS_1100/tabpIHKZ/ssubSUB_AUFTRAG:SAPLCOIH:1120/subHEADER:SAPLCOIH:0154/txtCAUFVD-IWERK")
-                    End If
-                    
-                    SafeStartTransaction "IW38"
-                    Dim today, tomorrow, Basic_Start_Date_LOW, Basic_Start_Date_HIGH
-                    today = Date
-                    tomorrow = DateAdd("d", 1, today)
-                    Basic_Start_Date_LOW = tomorrow
-                    If Weekday(today) = 6 Then ' today is Friday
-                        Basic_Start_Date_HIGH = DateAdd("d", 3, today)
-                    Else
-                        Basic_Start_Date_HIGH = tomorrow
-                    End If
-
-                    SafeSetText "wnd[0]/usr/ctxtGSTRP-LOW", Basic_Start_Date_LOW ' Basic Start Date - LOW
-                    SafeSetText "wnd[0]/usr/ctxtGSTRP-HIGH", Basic_Start_Date_HIGH ' Basic Start Date - HIGH
-                    SafeSetText "wnd[0]/usr/ctxtDATUV", "" ' Period - LOW
-                    SafeSetText "wnd[0]/usr/ctxtDATUB", "" ' Period - HIGH
-                    SafeSetText "wnd[0]/usr/ctxtSWERK-LOW", SAP_plantcode
-                    SafeSendVKey "wnd[0]", 8 ' Execute (F8)
-                    
-                    Dim grid, rowCount, colCount, ord, r, c
-                    Set grid = SafeFindById("wnd[0]/usr/cntlGRID1/shellcont/shell")
-                    rowCount = grid.RowCount
-                    'colCount = grid.ColumnCount
-
-                    ' --- 1) Get the ColumnOrder as a collection of technical IDs ---
-                    On Error Resume Next
-                    Set ord = grid.ColumnOrder ' to get techId of column header (e.g. AUFNR = Order)
-                    If Err.Number <> 0 Then
-                        Err.Clear
-                        CleanupAndTerminate "This ALV does not expose ColumnOrder as a collection. Cannot proceed without tech IDs."
-                    End If
-                    On Error GoTo 0
-
-                    ' --- 2) Build a map: techId -> visible index ---
-                    Dim techToIdx : Set techToIdx = CreateObject("Scripting.Dictionary")
-                    Dim colId
-                    For c = 0 To ord.Count - 1
-                        colId = ord.Item(c)
-                        If Not techToIdx.Exists(colId) Then techToIdx.Add colId, c
-                    Next
-
-                    ' --- 3) Define the required fields and their Excel target columns ---
-                    Dim wanted : Set wanted = CreateObject("Scripting.Dictionary")
-                    '   tech id     -> Excel column index (example mapping; adjust as you need)
-                    wanted.Add "GSTRP", 1 ' Basic Start Date
-                    wanted.Add "AUFNR", 3 ' Order
-                    wanted.Add "ZZTIDNR", 4 ' Technical IdentNo.
-                    wanted.Add "KTEXT", 7 ' Description
-
-                    ' --- 4) Validate the layout: all required tech IDs must exist ---
-                    Dim missing : Set missing = CreateObject("Scripting.Dictionary")
-                    Dim k
-                    For Each k In wanted.Keys
-                        If Not techToIdx.Exists(k) Then missing.Add k, True
-                    Next
-
-                    If missing.Count > 0 Then
-                        Dim msg, key
-                        msg = "Required column(s) missing in current IW38 layout: "
-                        For Each key In missing.Keys
-                            msg = msg & key & " "
-                        Next
-                        msg = msg & vbCrLf & "Please load the correct ALV layout (e.g., with technical names) and try again."
-                        CleanupAndTerminate msg
-                    End If
-
-                    ' --- 5) Pre-locate the KTEXT column index (for skip-row check) ---
-                    Dim ktextIdx
-                    ktextIdx = techToIdx("KTEXT")
-
-                    ' --- 6) Main loop: Skip rows where KTEXT contains "Indutec", else process wanted fields only ---
-                    Dim row_factor_to_adust_for_skip : row_factor_to_adust_for_skip = 1
-                    For r = 0 To rowCount - 1
-                        ' Read KTEXT strictly by tech ID; aborts if not readable
-                        value = GetCellValueStrict(grid, r, "KTEXT")
-                        
-                        If InStr(value, "Indutec") = 0 Then
-                            Dim row_in_excel_where_to_put : row_in_excel_where_to_put = i - emptyRowsUntilDone + row_factor_to_adust_for_skip + r
-                            ' Process only the fields we want
-                            For Each k In wanted.Keys
-                                Dim value, column_in_excel_where_to_put : column_in_excel_where_to_put = wanted(k)
-
-                                ' Read strictly by tech ID; aborts if not readable
-                                value = GetCellValueStrict(grid, r, k)
-
-                                If value <> "" Then
-                                    Log "  Taking from SAP" & vbCrLf & _
-                                        "  row: " & r & ", techId: " & k & ", value: " & value & vbCrLf & _
-                                        "  and putting to Excel" & vbCrLf & _
-                                        "  row: " & row_in_excel_where_to_put & ", column: " & column_in_excel_where_to_put
-                                    WriteToExcel row_in_excel_where_to_put, column_in_excel_where_to_put, value, False
-                                End If
-                            Next
-                        Else
-                            row_factor_to_adust_for_skip = row_factor_to_adust_for_skip - 1
-                            Log "Skipping SAP row " & r & " due to KTEXT containing 'Indutec'"
-                        End If
-                    Next
-                    Log "Finished copying upcoming PMs to shift logbook."
-                End If
                 CleanUpAndTerminate "Finished script execution after detecting " & emptyRowsUntilDone & " empty rows."
             End If
         Else
@@ -301,7 +183,7 @@ Sub initialize()
         Set workbook = excelApp.Workbooks.Open(filePath)
         If Err.Number <> 0 Or workbook Is Nothing Then
             Err.Clear
-            CleanupAndTerminate "Fehler beim Öffnen der Datei: " & filePath & vbCrLf & _
+            CleanupAndTerminate "ERROR: Could not open workbook: " & filePath & vbCrLf & _
                 "Details: " & Err.Description
         End If
         Log "Opened: " & filePath
@@ -522,8 +404,6 @@ Function Confirm_WO(wo, mitarbeiter, dauerInStunden, shift_Start_Date, massnahme
         SafeSetSelected "wnd[0]/usr/chkAFRUD-AUERU", True ' Tick "Final confirmation" checkbox
         SafeSetSelected "wnd[0]/usr/chkAFRUD-LEKNW", True ' Tick "No remaining work" checkbox
     End If
-    
-    WScript.Quit
     
     Dim ConfirmationResponse
     If autoConfirmResponse = vbYes Then
