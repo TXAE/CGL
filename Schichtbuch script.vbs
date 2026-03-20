@@ -583,9 +583,9 @@ Function Confirm_WO(wo, mitarbeiter, dauerInStunden, startzeit, endzeit, massnah
         remainingText = massnahme
         counter = 1
         Do While Len(remainingText) > 0
-            Log "remainingText length: " & Len(remainingText) & " // remainingText: " & remainingText
+            'Log "remainingText length: " & Len(remainingText) & " // remainingText: " & remainingText
             currentChunk = Left(remainingText, 72)
-            Log "Putting chunk " & counter & " of confirmation text into long text editor: " & currentChunk
+            'Log "Putting chunk " & counter & " of confirmation text into long text editor: " & currentChunk
             
             Dim controlPath
             controlPath = "wnd[0]/usr/tblSAPLSTXXEDITAREA/txtRSTXT-TXLINE[2," & counter & "]"
