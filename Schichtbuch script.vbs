@@ -622,19 +622,6 @@ Function Check_if_WO_needs_TECO(wo_Nr)
     SafeStartTransaction "IW32"
     SafeSetText "wnd[0]/usr/ctxtCAUFVD-AUFNR", wo_Nr
     SafeSendVKey "wnd[0]", 0
-    ' below checks should not be necessary as they should be handled by previously called function
-    ' Check_if_WO_is_ready_for_script(), but just to be sure before we do a TECO on the order, 
-    ' we check the system status again and exit if order is already TECO or CLSD
-    'Dim sysStatus : sysStatus = GetSysStatus()
-    'If InStr(sysStatus, "TECO") > 0 Then
-    '    Log "WO " & wo_Nr & " already completed."
-    '    WriteToExcel i, column_in_excel_where_to_put_message, "WO " & wo_Nr & " already completed.", False
-    '    Exit Function
-    'ElseIf InStr(sysStatus, "CLSD") > 0 Then
-    '    Log "WO " & wo_Nr & " already closed."
-    '    WriteToExcel i, column_in_excel_where_to_put_message, "WO " & wo_Nr & " already closed.", False
-    '    Exit Function
-    'End If
     Dim skipReason : skipReason = Check_if_WO_contains_skip_condition()
     If skipReason <> "" Then
         Check_if_WO_needs_TECO = SkipReason
