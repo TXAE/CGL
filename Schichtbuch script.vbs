@@ -645,7 +645,7 @@ Function Check_if_WO_needs_TECO(wo_Nr)
     orderText = SafeGetText("wnd[0]/usr/subSUB_ALL:SAPLCOIH:3001/ssubSUB_LEVEL:SAPLCOIH:1100/subSUB_KOPF:SAPLCOIH:1102/subSUB_TEXT:SAPLCOIH:1103/cntlLTEXT/shell")
     SafeSetText "wnd[0]/usr/subSUB_ALL:SAPLCOIH:3001/ssubSUB_LEVEL:SAPLCOIH:1100/subSUB_KOPF:SAPLCOIH:1102/subSUB_TEXT:SAPLCOIH:1103/cntlLTEXT/shell", _
         orderText & vbCr & vbCr & _
-        "Completed by script executed by user " & username & " on " & Now & " using data from excel" & vbCr & filePath
+        "Completed by script executed by user " & userName & " on " & Now & " using data from shift log:" & vbCr & filePath
 
     If autoConfirmResponse = vbYes Then
         CNF_Not_CAPR_response = vbYes
