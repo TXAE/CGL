@@ -17,14 +17,6 @@ onlyParse_rowsToInspect = False 'TRUE IF YOU ONLY WANT THE SCRIPT TO PARSE THROU
 ' === LOOP THROUGH ROWS ===
 Dim i, j, SkipReason, rowText, Tag, WO_Nr, Schicht, Standort, Mitarbeiter, Bemerkung, Fehlerbeschreibung, Massnahme, Startzeit, Endzeit, DauerInH, Status, emptyRowCounter, rowsToInspect, onlyParse_rowsToInspect
 For i = 2 To lastRow + 10 ' Assuming row 1 is header, iterate through 10 extra rows to check for emptiness at the end of the logbook
-    ' Ensure status buffer exists to collect per-row messages (buffered write to Excel)
-    'If Not IsArray(g_statusBuffer) Then
-    '    ReDim g_statusBuffer(lastRow)
-    '    Dim idxInit
-    '    For idxInit = 0 To lastRow
-    '        g_statusBuffer(idxInit) = ""
-    '    Next
-    'End If
     If Not onlyParse_rowsToInspect Or IsInArray(i, rowsToInspect) Then
         SkipReason = ""
         rowText = ""
@@ -302,28 +294,6 @@ For i = 2 To lastRow + 10 ' Assuming row 1 is header, iterate through 10 extra r
         End If
     End If
 Next
-
-' Performance improvement - problem: when script faults, not all is written! :(
-' --- Flush buffered writes back to Excel in a single COM call when possible
-' On Error Resume Next
-' If lastRow >= 2 And IsArray(g_statusBuffer) Then
-'     Dim outArr, r, rowsCount
-'     rowsCount = lastRow - 1 ' rows from 2..lastRow
-'     ReDim outArr(rowsCount - 1, 0)
-'     For r = 2 To lastRow
-'         outArr(r - 2, 0) = g_statusBuffer(r)
-'     Next
-'     ' Write the buffered column to Excel in one shot
-'     sheet1.Range(sheet1.Cells(2, 16), sheet1.Cells(lastRow, 16)).Value = outArr
-' End If
-' On Error GoTo 0
-
-' ' Restore Excel UI & calculation settings
-' On Error Resume Next
-' excelApp.ScreenUpdating = prevScreenUpdating
-' If Not IsEmpty(prevCalculation) Then excelApp.Calculation = prevCalculation
-' excelApp.EnableEvents = True
-' On Error GoTo 0
 
 CleanupAndTerminate "Finished."
 
