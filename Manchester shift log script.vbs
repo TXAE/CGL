@@ -441,32 +441,30 @@ Function Check_if_WO_needs_confirmation(wo_Nr)
 End Function
 
 Function Confirm_WO(wo, mitarbeiter, dauerInStunden, shift_Start_Date, massnahme, finalConfirmation)
-    Log "Confirming WO      : " & wo & vbCrLf & _
-        " Employee          : " & mitarbeiter & vbCrLf & _
-        " Duration (hours)  : " & dauerInStunden & vbCrLf & _
-        " Start (UTC)       : " & shift_Start_Date & vbCrLf & _
-        " What was done     : " & massnahme & vbCrLf & _
-        " finalConfirmation : " & finalConfirmation
+    Log "Confirming WO            : " & wo & vbCrLf & _
+        " Employee                : " & mitarbeiter & vbCrLf & _
+        " Duration (hours)        : " & dauerInStunden & vbCrLf & _
+        " Shift Start  Date (UTC) : " & shift_Start_Date & vbCrLf & _
+        " What was done           : " & massnahme & vbCrLf & _
+        " finalConfirmation       : " & finalConfirmation
     
     
     Dim start_dt, finish_dt
-    start_dt = ParseIso8601Z(shift_Start_Date)
-
-    ' B) Start variables
-    Dim work_start_date, work_start_time
-    work_start_date = FormatDateDDMMYYYY(start_dt) ' => "09.02.2026"
-    work_start_time = FormatTimeHHMMSS(start_dt) ' => "23:50:00"
-
-    ' C) Finish variables (add duration in seconds)
-    Dim dur_seconds
-    dur_seconds = ParseDurationHoursToSeconds(dauerInStunden)
-    finish_dt = DateAdd("s", dur_seconds, start_dt)
+    finish_dt = ParseIso8601Z(shift_Start_Date)
 
     Dim work_finish_date, work_finish_time
     work_finish_date = FormatDateDDMMYYYY(finish_dt) ' => "10.02.2026"
     work_finish_time = FormatTimeHHMMSS(finish_dt) ' => "01:20:00"
 
-    ' Demo output (use cscript.exe to see console output)
+    ' Subtract duration in seconds
+    Dim dur_seconds
+    dur_seconds = ParseDurationHoursToSeconds(dauerInStunden)
+    start_dt = DateAdd("s", -dur_seconds, finish_dt)
+
+    Dim work_start_date, work_start_time
+    work_start_date = FormatDateDDMMYYYY(start_dt) ' => "09.02.2026"
+    work_start_time = FormatTimeHHMMSS(start_dt) ' => "23:50:00"
+
     Log "work_start_date  = " & work_start_date
     Log "work_start_time  = " & work_start_time
     Log "work_finish_date = " & work_finish_date
