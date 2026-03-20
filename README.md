@@ -86,6 +86,9 @@ This VBScript scans the [**shift logbook excel**](Muster_2026_Schichtbuch.xlsx),
 2. Ensure folder is writable (script creates `./logs/`)
 3. Ensure SAP GUI scripting is enabled:
    ![how_to_enable_scripting_in_SAP.png](how_to_enable_scripting_in_SAP.png)
+4. Ensure graphical PC editor is disabled:
+   In SAP IW41 Tcode, open any work order to confirm and click on 'long text'
+   Click Goto. Then Configure Editor. Disable Graphical PC Editor.
 5. Run the script
    - from [command-line](#command-line-usage) or
    - import the [windows task](shift%20logbook%20script%20windows%20task.xml) to the windows task scheduler to let the script run automatically (e.g. every day at 2PM)
@@ -105,7 +108,7 @@ cscript //nologo "Schichtbuch script.vbs" [filePath=<path_or_url>] [autoConfirm=
 ### `filePath`
 **Default:** not provided
 **Behavior:**
-- If filePath provided: Uses <path_or_url> e.g. filePath="C:\Data\Schichtbuch.xlsx"
+- If filePath provided: Uses <path_or_url> e.g. filePath="C:\Data\Schichtbuch.xlsx" regardless of useCurrentExcel-parameter
 - If no filePath provided:
    - If `useCurrentExcel=yes` → script builds current-month SharePoint path (specific to Berlin)
    - Otherwise → shows Excel file-open dialog so user can select a file
@@ -120,23 +123,30 @@ cscript //nologo "Schichtbuch script.vbs" [filePath=<path_or_url>] [autoConfirm=
 **Default:** not provided - interpreted as `no`
 **Behavior:**
 - `yes` → build SharePoint path for current month's Schichtbuch
-- `no`  → normal file selection process
+- `no`  → shows Excel file-open dialog so user can select a file
 
 ---
 
 ## Run examples
 
-### Fully automatic (Auto-select current month, specific to Berlin plant)
+### Fully automatic (Auto-select current excel file, auto-confirm SAP interactions)
+### This is how the script would typically be run in production (e.g. via windows task scheduler)
 ```
 cscript //nologo "Schichtbuch script.vbs" useCurrentExcel=yes autoConfirm=yes
 ```
 
-### Fully automatic (using a provided filePath, e.g. when you want to run the script on an older month's shift logbook)
+### Fully automatic (using a provided filePath, e.g. when you want to run the script on an older shift logbook)
 ```
-cscript //nologo "Schichtbuch script.vbs" filePath="C:\Data\Schichtbuch.xlsx" autoConfirm=yes
+cscript //nologo "Schichtbuch script.vbs" filePath="C:\Data\\shift_logbook.xlsx" autoConfirm=yes
 ```
 
-### Interactive (asks user about everything, very slow, good for debugging)
+### Semi-automatic (using a provided filePath, asks user before each SAP interaction)
+### Good for first runs to understand how the script works, also good for debugging
+```
+cscript //nologo "Schichtbuch script.vbs" filePath="C:\Data\shift_logbook.xlsx" autoConfirm=no
+```
+
+### Interactive (asks user about which excel file to use & about each SAP interaction)
 ```
 cscript //nologo "Schichtbuch script.vbs"
 ```
@@ -181,7 +191,9 @@ Stored in `./logs/<script>_<user>_<timestamp>.log`.
 
 - Hard skip conditions: missing WO, wrong WO format, message already present, status missing
 - Soft skips: missing employee, missing times, invalid conversions
-- SAP skip conditions: purchases found, multiple operations
+- Conditions that will cause the script to not technically complete a WO in SAP: 
+   - purchase in SAP WO
+   - multiple operations planned in SAP WO, but no operation specified in Excel
 - SAP wrappers abort cleanly on layout or scripting errors
 
 ---
@@ -190,8 +202,6 @@ Stored in `./logs/<script>_<user>_<timestamp>.log`.
 
 - SAP GUI layout differences require adjustments
 - IW38 helper depends on technical ID layout
-- Massnahme truncated to 40 chars
-- Buffered writes disabled for reliability
 
 ---
 
