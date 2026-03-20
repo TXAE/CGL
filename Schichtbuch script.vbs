@@ -567,20 +567,48 @@ Function Confirm_WO(wo, mitarbeiter, dauerInStunden, startzeit, endzeit, massnah
     SafeSetText "wnd[0]/usr/ctxtAFRUD-ISDZ", TimeValue(startzeit) ' work start time
     SafeSetText "wnd[0]/usr/ctxtAFRUD-IEDD", DateValue(endzeit) ' work end day
     SafeSetText "wnd[0]/usr/ctxtAFRUD-IEDZ", TimeValue(endzeit) ' work end time
-    If Len(massnahme) > 40 Then
-        Log "'Massnahme' has more than 40 chars, but SAP confirmation text cuts off after 40 chars. Long text input not yet programmed so shortening massnahme to first 40 chars"
-        massnahme = Left(massnahme, 40)
-    End If
-    SafeSetText "wnd[0]/usr/txtAFRUD-LTXA1", massnahme ' confirm text short - 40 char max
-    SafeSendVKey "wnd[0]", 0 ' enter so user can see name next to personnel number
-    If SafeGetText("wnd[0]/sbar") <> "" Then
-        CleanupAndTerminate "Unable to confirm WO - " & SafeGetText("wnd[0]/sbar")
-    End If
-
     If finalConfirmation Then
         SafeSetText "wnd[0]/usr/txtAFRUD-OFMNW_2", "0" ' Remaining work
         SafeSetSelected "wnd[0]/usr/chkAFRUD-AUERU", True ' Final confirmation
         SafeSetSelected "wnd[0]/usr/chkAFRUD-LEKNW", True ' No remaining work
+    End If
+    If Len(massnahme) > 40 Then
+        Log "'Confirmation text' has more than 40 chars, but short SAP confirmation text cuts off after 40 chars." & vbCrLf & _
+            "Putting full confirmation text into long text editor instead, so that no information is lost. " & vbCrLf & _
+            "What was done (confirmation text) length: " & Len(massnahme) & vbCrLf & _
+            "What was done (confirmation text): " & massnahme
+        SafePress "wnd[0]/usr/btn*AFRUD-LTXA1"
+        
+        Dim remainingText, currentChunk, counter
+        remainingText = massnahme
+        counter = 1
+        Do While Len(remainingText) > 0
+            Log "remainingText length: " & Len(remainingText) & " // remainingText: " & remainingText
+            currentChunk = Left(remainingText, 72)
+            Log "Putting chunk " & counter & " of confirmation text into long text editor: " & currentChunk
+            
+            Dim controlPath
+            controlPath = "wnd[0]/usr/tblSAPLSTXXEDITAREA/txtRSTXT-TXLINE[2," & counter & "]"
+            If Not SafeControlExists(controlPath) Then
+                CleanupAndTerminate "ERROR: Tried to put confirmation text into long text editor." & vbCrLf & _
+                    "Control does not exist: " & controlPath & vbCrLf & _
+                    "This could indicate that the graphical PC editor is enabled." & vbCrLf & _
+                    "To fix this: In IW41 Tcode, open a work order to confirm and click on 'long text'" & vbCrLf & _
+                    "Click Goto. Then Configure Editor. Disable Graphical PC Editor. Then run the script again."
+            End If
+            
+            SafeSetText controlPath, currentChunk
+            remainingText = Mid(remainingText, 73)
+            counter = counter + 1
+        Loop
+        SafeSendVKey "wnd[0]", 3 ' F3 to go back from document flow to WO in SAP GUI
+        ' Can't check for SafeGetText("wnd[0]/sbar") <> "" here because SAP always outputs 'Text changes were transferred' to status bar (sbar) in case of long text input
+    Else
+        SafeSetText "wnd[0]/usr/txtAFRUD-LTXA1", massnahme ' confirm text short - 40 char max
+        SafeSendVKey "wnd[0]", 0 ' enter so user can see name next to personnel number and to check for error from SAP, see below
+        If SafeGetText("wnd[0]/sbar") <> "" Then
+            CleanupAndTerminate "ERROR: Unable to confirm WO - " & SafeGetText("wnd[0]/sbar")
+        End If
     End If
 
     Dim ConfirmationResponse
@@ -1374,6 +1402,23 @@ Sub SafeSelect(objectPath)
     End If
     On Error GoTo 0
 End Sub
+
+' Safely check if a control exists in SAP GUI without raising an error.
+' Returns True if control exists, False otherwise.
+' Usage: If SafeControlExists("wnd[0]/usr/ctxtFieldName") Then
+Function SafeControlExists(controlPath)
+    On Error Resume Next
+    Dim obj
+    Set obj = session.findById(controlPath)
+
+    If Err.Number <> 0 Or obj Is Nothing Then
+        SafeControlExists = False
+        Err.Clear
+    Else
+        SafeControlExists = True
+    End If
+    On Error GoTo 0
+End Function
 
 ' Reads a value by technical field id only.
 ' Aborts the script with a clear message if the field cannot be read (layout mismatch or restriction).
