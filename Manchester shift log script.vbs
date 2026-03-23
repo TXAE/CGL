@@ -2,7 +2,7 @@
 ' Mechanics & electricians have to log their work in a digital shift log & in SAP in Manchster. It is double work.
 ' This script parses through an export of the logged work and logs the work in SAP (either fully automatic or asks user to confirm every single SAP interaction, depending on parameter)
 Option Explicit ' forces to declare all variables with Dim, Private, or Public
-Dim g_logFilePath, logFile, filePath, excelApp, workbook, sheet1, lastRow, lastCol, loadedFromMainScript, fso, file, code, session, autoConfirmResponse, argFilePath, argUseCurrentExcel, argAutoConfirm
+Dim userName, g_logFilePath, logFile, filePath, excelApp, workbook, sheet1, lastRow, lastCol, loadedFromMainScript, fso, file, code, session, autoConfirmResponse, argFilePath, argUseCurrentExcel, argAutoConfirm
 Dim sheet1_cached, employeeMapping_cache, g_timezoneBias, g_statusBuffer(), prevScreenUpdating, prevCalculation, column_in_excel_where_to_put_message, done_text_from_excel, cancelled_text_from_excel, SAP_plantcode
 initialize()
 
@@ -459,7 +459,7 @@ Function Check_if_WO_needs_TECO(wo_Nr)
     orderText = SafeGetText("wnd[0]/usr/subSUB_ALL:SAPLCOIH:3001/ssubSUB_LEVEL:SAPLCOIH:1100/subSUB_KOPF:SAPLCOIH:1102/subSUB_TEXT:SAPLCOIH:1103/cntlLTEXT/shell")
     SafeSetText "wnd[0]/usr/subSUB_ALL:SAPLCOIH:3001/ssubSUB_LEVEL:SAPLCOIH:1100/subSUB_KOPF:SAPLCOIH:1102/subSUB_TEXT:SAPLCOIH:1103/cntlLTEXT/shell", _
         orderText & vbCr & vbCr & _
-        "Completed by script executed by user " & username & " on " & Now & " using data from excel" & vbCr & filePath
+        "Completed by script executed by user " & userName & " on " & Now & " using data from excel" & vbCr & filePath
     
     If autoConfirmResponse = vbYes Then
         CNF_Not_CAPR_response = vbYes
