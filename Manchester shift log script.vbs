@@ -94,7 +94,7 @@ CleanupAndTerminate "Finished."
 
 
 Sub initialize()
-    Dim logFolder, scriptName, userName, dateTimeStamp
+    Dim logFolder, scriptName, dateTimeStamp
     
     column_in_excel_where_to_put_message = 16
     
@@ -390,19 +390,48 @@ Function Confirm_WO(wo, mitarbeiter, dauerInStunden, shift_Start_Date, massnahme
     SafeSetText "wnd[0]/usr/ctxtAFRUD-ISDZ", work_start_time ' work start time
     SafeSetText "wnd[0]/usr/ctxtAFRUD-IEDD", work_finish_date ' work end day
     SafeSetText "wnd[0]/usr/ctxtAFRUD-IEDZ", work_finish_time ' work end time
-    If Len(massnahme) > 40 Then
-        Log "'Massnahme' has more than 40 chars, but SAP confirmation text cuts off after 40 chars. Long text input not yet programmed so shortening massnahme to first 40 chars"
-        massnahme = Left(massnahme, 40)
-    End If
-    SafeSetText "wnd[0]/usr/txtAFRUD-LTXA1", massnahme ' confirm text short - 40 char max
-    SafeSendVKey "wnd[0]", 0 ' enter so user can see name next to personnel number
-    If SafeGetText("wnd[0]/sbar") <> "" Then
-        CleanupAndTerminate "Unable to confirm WO - " & SafeGetText("wnd[0]/sbar")
-    End If
     If finalConfirmation Then
         SafeSetText "wnd[0]/usr/txtAFRUD-OFMNW_2", "0" ' Set "Remaining work" field to 0
         SafeSetSelected "wnd[0]/usr/chkAFRUD-AUERU", True ' Tick "Final confirmation" checkbox
         SafeSetSelected "wnd[0]/usr/chkAFRUD-LEKNW", True ' Tick "No remaining work" checkbox
+    End If
+    If Len(massnahme) > 40 Then
+        Log "'Confirmation text' has more than 40 chars, but short SAP confirmation text cuts off after 40 chars." & vbCrLf & _
+            "Putting full confirmation text into long text editor instead, so that no information is lost. " & vbCrLf & _
+            "What was done (confirmation text) length: " & Len(massnahme) & vbCrLf & _
+            "What was done (confirmation text): " & massnahme
+        SafePress "wnd[0]/usr/btn*AFRUD-LTXA1"
+        
+        Dim remainingText, currentChunk, counter
+        remainingText = massnahme
+        counter = 1
+        Do While Len(remainingText) > 0
+            'Log "remainingText length: " & Len(remainingText) & " // remainingText: " & remainingText
+            currentChunk = Left(remainingText, 72)
+            'Log "Putting chunk " & counter & " of confirmation text into long text editor: " & currentChunk
+            
+            Dim controlPath
+            controlPath = "wnd[0]/usr/tblSAPLSTXXEDITAREA/txtRSTXT-TXLINE[2," & counter & "]"
+            If Not SafeControlExists(controlPath) Then
+                CleanupAndTerminate "ERROR: Tried to put confirmation text into long text editor." & vbCrLf & _
+                    "Control does not exist: " & controlPath & vbCrLf & _
+                    "This could indicate that the graphical PC editor is enabled." & vbCrLf & _
+                    "To fix this: In IW41 Tcode, open a work order to confirm and click on 'long text'" & vbCrLf & _
+                    "Click Goto. Then Configure Editor. Disable Graphical PC Editor. Then run the script again."
+            End If
+            
+            SafeSetText controlPath, currentChunk
+            remainingText = Mid(remainingText, 73)
+            counter = counter + 1
+        Loop
+        SafeSendVKey "wnd[0]", 3 ' F3 to go back from document flow to WO in SAP GUI
+        ' Can't check for SafeGetText("wnd[0]/sbar") <> "" here because SAP always outputs 'Text changes were transferred' to status bar (sbar) in case of long text input
+    Else
+        SafeSetText "wnd[0]/usr/txtAFRUD-LTXA1", massnahme ' confirm text short - 40 char max
+        SafeSendVKey "wnd[0]", 0 ' enter so user can see name next to personnel number and to check for error from SAP, see below
+        If SafeGetText("wnd[0]/sbar") <> "" Then
+            CleanupAndTerminate "ERROR: Unable to confirm WO - " & SafeGetText("wnd[0]/sbar")
+        End If
     End If
     
     Dim ConfirmationResponse
@@ -423,19 +452,20 @@ Function Confirm_WO(wo, mitarbeiter, dauerInStunden, shift_Start_Date, massnahme
             SafeSendVKey "wnd[0]", 8 'F8 to open Goods movements overview
             SafeSendVKey "wnd[0]", 11 ' Saves the confirmation OR confirmation with goods movement
             'Confirm_WO = Confirm_WO & " // " & 'SafeFindById("wnd[0]/sbar").text ' attach return value from SAP confirmation number e.g. "Number of confirmations saved for order 417052748: 1"
-            Confirm_WO = "WO confirmed"
-
-            'TODO: might get a warning from SAP here that ticking 'no remaining work' will set the remaining work field to zero. 
-            'This happens e.g. when a WO is planned with 1hr, but only 0,5h was worked for it (e.g. 416100298). TODO guard against this
-            If finalConfirmation Then
-                WScript.Sleep 500 ' hate to be doing this, but SAP can still be working on this work order after the script confirmed it (i.e. when there are goods movements), so waiting here to not error out bc work order is still being processed 
-                Confirm_WO = Confirm_WO & " // " & Check_if_WO_needs_TECO(wo)
-            End If
+            Confirm_WO = "confirmed"
         Case vbNo
             Confirm_WO = "user clicked no when asked whether to confirm WO " & wo & ". Not confirming, but proceeding with the script..."
         Case vbCancel
             CleanupAndTerminate "user clicked cancel when asked whether to confirm WO " & wo & ". Not confirming and terminating the script."
     End Select
+    If ConfirmationResponse = vbYes Or ConfirmationResponse = vbNo Then
+        'TODO: might get a warning from SAP here that ticking 'no remaining work' will set the remaining work field to zero. 
+        'This happens e.g. when a WO is planned with 1hr, but only 0,5h was worked for it (e.g. 416100298). TODO guard against this
+        If finalConfirmation Then
+            WScript.Sleep 500 ' hate to be doing this, but SAP can still be working on this work order after the script confirmed it (i.e. when there are goods movements), so waiting here to not error out bc work order is still being processed 
+            Confirm_WO = Confirm_WO & " // " & Check_if_WO_needs_TECO(wo)
+        End If
+    End If
     Log "Confirm_WO " & wo_Nr & " returned: " & Confirm_WO
 End Function
 
@@ -1139,6 +1169,23 @@ Sub SafeSelect(objectPath)
     On Error GoTo 0
 End Sub
 
+' Safely check if a control exists in SAP GUI without raising an error.
+' Returns True if control exists, False otherwise.
+' Usage: If SafeControlExists("wnd[0]/usr/ctxtFieldName") Then
+Function SafeControlExists(controlPath)
+    On Error Resume Next
+    Dim obj
+    Set obj = session.findById(controlPath)
+
+    If Err.Number <> 0 Or obj Is Nothing Then
+        SafeControlExists = False
+        Err.Clear
+    Else
+        SafeControlExists = True
+    End If
+    On Error GoTo 0
+End Function
+
 ' Reads a value by technical field id only.
 ' Aborts the script with a clear message if the field cannot be read (layout mismatch or restriction).
 Function GetCellValueStrict(grid, rowIndex, techId)
@@ -1165,7 +1212,6 @@ Sub CleanupAndTerminate(LastMessageToUser)
     'excelApp.Quit
     
     Set sheet1 = Nothing
-    Set sheet2 = Nothing
     Set workbook = Nothing
     Set excelApp = Nothing
     
