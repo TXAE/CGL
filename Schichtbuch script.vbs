@@ -3,7 +3,7 @@
 ' This script parses through the spreadsheet, detects logged work in the spreadsheet that is not yet logged in SAP
 ' and can log the work in SAP (either fully automatic or asks user to confirm every single SAP interaction, depending on parameter)
 Option Explicit ' forces to declare all variables with Dim, Private, or Public
-Dim g_logFilePath, logFile, filePath, excelApp, workbook, sheet1, sheet2, lastRow, lastCol, loadedFromMainScript, fso, file, code, session, autoConfirmResponse, argFilePath, argUseCurrentExcel, argAutoConfirm
+Dim userName, g_logFilePath, logFile, filePath, excelApp, workbook, sheet1, sheet2, lastRow, lastCol, loadedFromMainScript, fso, file, code, session, autoConfirmResponse, argFilePath, argUseCurrentExcel, argAutoConfirm
 Dim sheet1_cached, sheet2_cached, g_timezoneBias, g_statusBuffer(), prevScreenUpdating, prevCalculation, column_in_excel_where_to_put_message, done_text_from_excel, cancelled_text_from_excel, SAP_plantcode
 initialize()
 
@@ -300,7 +300,7 @@ CleanupAndTerminate "Finished."
 
 
 Sub initialize()
-    Dim logFolder, scriptName, userName, dateTimeStamp
+    Dim logFolder, scriptName, dateTimeStamp
 
     column_in_excel_where_to_put_message = 16
 
