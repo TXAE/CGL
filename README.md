@@ -1,7 +1,7 @@
 # Schichtbuch → SAP Sync (VBScript)
 
-Automate the double work of logging maintenance tasks twice: once in the [**shift logbook excel**](Muster_2026_Schichtbuch.xlsx) and again in **SAP**.  
-This VBScript scans the [**shift logbook excel**](Muster_2026_Schichtbuch.xlsx), identifies entries not yet processed in SAP, and **confirms, completes, or cancels** the corresponding SAP work orders (using T-codes IW41 / IW32), either fully automatically or with user confirmations.
+Automate the double work of logging maintenance tasks twice: once in the [**shift logbook excel**](Resources/Muster_2026_Schichtbuch.xlsx) and again in **SAP**.  
+This VBScript scans the [**shift logbook excel**](Resources/Muster_2026_Schichtbuch.xlsx), identifies entries not yet processed in SAP, and **confirms, completes, or cancels** the corresponding SAP work orders (using T-codes IW41 / IW32), either fully automatically or with user confirmations.
 
 > 🧑‍🏭 Typical users: Maintenance & Reliability (M&R) planners, supervisors, managers
 
@@ -35,13 +35,13 @@ This VBScript scans the [**shift logbook excel**](Muster_2026_Schichtbuch.xlsx),
 
 ## Features
 
-- 🔍 **Reads the [shift logbook excel](Muster_2026_Schichtbuch.xlsx)** in bulk (fast, minimal COM calls)
+- 🔍 **Reads the [shift logbook excel](Resources/Muster_2026_Schichtbuch.xlsx)** in bulk (fast, minimal COM calls)
 - 👷 **Maps employee names → SAP personnel numbers** from another sheet (can use lenient name matching)
 - 🕒 **Converts Excel time fractions** into proper timestamps and correctly handles **overnight work**
 - 🌍 Ensures all timestamps are **UTC** (using Windows ActiveTimeBias registry entry)
 - 🗃️ **Confirms work orders** in IW41 including short texts, work duration, start/end, and final confirmation settings
-- ❌ **Cancels orders** in IW32 when the [shift logbook excel](Muster_2026_Schichtbuch.xlsx) marks them as cancelled
-- 🧹 **Completes (TECO)** work orders when the [shift logbook excel](Muster_2026_Schichtbuch.xlsx) marks them as complete
+- ❌ **Cancels orders** in IW32 when the [shift logbook excel](Resources/Muster_2026_Schichtbuch.xlsx) marks them as cancelled
+- 🧹 **Completes (TECO)** work orders when the [shift logbook excel](Resources/Muster_2026_Schichtbuch.xlsx) marks them as complete
 - 📄 **Writes back results** to the Excel (column 16) only if no existing message is present
 - 🔁 **Optional helper:** copies upcoming PMs from **IW38** into the Excel (layout-dependent)
 - 🛡️ Robust SAP wrappers (`SafeFindById`, `SafeSetText`, `SafeSendVKey`, etc.)  
