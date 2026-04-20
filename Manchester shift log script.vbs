@@ -2,8 +2,8 @@
 ' Mechanics & electricians have to log their work in a digital shift log & in SAP in Manchster. It is double work.
 ' This script parses through an export of the logged work and logs the work in SAP (either fully automatic or asks user to confirm every single SAP interaction, depending on parameter)
 Option Explicit ' forces to declare all variables with Dim, Private, or Public
-Dim userName, g_logFilePath, logFile, filePath, excelApp, workbook, sheet1, lastRow, lastCol, loadedFromMainScript, fso, file, code, session, autoConfirmResponse, argFilePath, argUseCurrentExcel, argAutoConfirm
-Dim sheet1_cached, employeeMapping_cache, g_timezoneBias, g_statusBuffer(), prevScreenUpdating, prevCalculation, column_in_excel_where_to_put_message, done_text_from_excel, cancelled_text_from_excel, SAP_plantcode
+Dim userName, g_logFilePath, logFile, filePath, excelApp, workbook, sheet1, lastRow, lastCol, fso, file, session, autoConfirmResponse, argFilePath, argUseCurrentExcel, argAutoConfirm
+Dim shell, sheet1_cached, employeeMapping_cache, g_timezoneBias, g_statusBuffer(), prevScreenUpdating, prevCalculation, column_in_excel_where_to_put_message, done_text_from_excel, cancelled_text_from_excel, SAP_plantcode
 initialize()
 
 ' DEBUGGING SETTINGS
@@ -15,7 +15,7 @@ onlyParse_rowsToInspect = False 'TRUE IF YOU ONLY WANT THE SCRIPT TO PARSE THROU
 
 
 ' === LOOP THROUGH ROWS ===
-Dim i, j, SkipReason, rowText, Shift_Start_Date, WO_Nr, Mitarbeiter, Massnahme, DauerInH, Status, emptyRowCounter, rowsToInspect, onlyParse_rowsToInspect
+Dim i, j, SkipReason, rowText, Shift_Start_Date, WO_Nr, Mitarbeiter, Massnahme, DauerInH, NoFollowUpRequired, FollowUpComments,FollowUpComplete, emptyRowCounter, rowsToInspect, onlyParse_rowsToInspect
 For i = 2 To lastRow ' Assuming row 1 is header
     If Not onlyParse_rowsToInspect Or IsInArray(i, rowsToInspect) Then
         SkipReason = ""
@@ -28,9 +28,12 @@ For i = 2 To lastRow ' Assuming row 1 is header
         WO_Nr = GetCellFromCache(sheet1_cached, i, 6)
         Massnahme = GetCellFromCache(sheet1_cached, i, 10)
         DauerInH = GetCellFromCache(sheet1_cached, i, 11)
-        Status = GetCellFromCache(sheet1_cached, i, 12)
+        NoFollowUpRequired = GetCellFromCache(sheet1_cached, i, 12)
+        FollowUpComments = GetCellFromCache(sheet1_cached, i, 13)
+        FollowUpComplete = GetCellFromCache(sheet1_cached, i, 14)
+        If FollowUpComments <> "" Then Massnahme = Massnahme & " // Follow-up comments: " & FollowUpComments
 
-        ' HARD skip conditions - no WO, already something in message column from a previous script execution or no status/cancelled
+        ' HARD skip conditions - no WO, already something in message column from a previous script execution or no entry for NoFollowUpRequired
         If WO_Nr = "" Then
             SkipReason = SkipReason & vbCrLf & " - No WO found."
         ElseIf Len(WO_Nr) <> 9 Then
@@ -47,8 +50,8 @@ For i = 2 To lastRow ' Assuming row 1 is header
         If DauerInH = "" Then
             SkipReason = SkipReason & vbCrLf & " - No 'DauerInH' for WO " & WO_Nr & " found."
         End If
-        If Status = "" Then
-            SkipReason = SkipReason & vbCrLf & " - No 'Status' for WO " & WO_Nr & " found."
+        If NoFollowUpRequired = "" Then
+            SkipReason = SkipReason & vbCrLf & " - No entry for 'NoFollowUpRequired' for WO " & WO_Nr & " found."
         End If
         
         If IsInArray(i, rowsToInspect) Then
@@ -77,7 +80,7 @@ For i = 2 To lastRow ' Assuming row 1 is header
             Log vbCrLf & "Checking row: " & i & " with the following content:" & vbCrLf & rowText
             If Check_if_WO_needs_confirmation(WO_Nr) Then
                 Dim confirmation
-                confirmation = Confirm_WO(WO_Nr, Mitarbeiter, DauerInH, Shift_Start_Date, Massnahme, Status = "True")
+                confirmation = Confirm_WO(WO_Nr, Mitarbeiter, DauerInH, Shift_Start_Date, Massnahme, NoFollowUpRequired = "True" Or FollowUpComplete = "True")
                 WriteToExcel i, column_in_excel_where_to_put_message, confirmation, False
                 Log "confirmation for WO " & WO_Nr & ": " & confirmation
                 'Else
@@ -216,7 +219,7 @@ Sub initialize()
     ' --- Load employee -> SAP personnel number mapping from standalone spreadsheet into memory once ---
     Dim mappingFilePath, mappingWb, mappingSheet, mappingExcel, lastRow2, lastCol2
     mappingFilePath = "https://cargillonline.sharepoint.com/sites/MaintenanceShiftLog/Shared%20Documents/General/Yesterdays%20Log/Employee_SAP_mapping.xlsx"
-    
+    Log "Opening employee mapping workbook invisibly. Path: " & mappingFilePath
     ' Attempt to open the mapping file in a separate, invisible Excel instance so nothing is shown to the user
     On Error Resume Next
     Set mappingExcel = CreateObject("Excel.Application")
@@ -729,45 +732,6 @@ Function TrimAfterComma(inputStr)
     TrimAfterComma = result
 End Function
 
-Function ConvertToUTC(inputDate)
-    On Error Resume Next
-    
-    Dim bias, utcDate
-    ' Use cached timezone bias if available (set in initialize())
-    If Not IsEmpty(g_timezoneBias) And g_timezoneBias <> "" Then
-        bias = g_timezoneBias
-    Else
-        Dim objShell
-        Set objShell = CreateObject("WScript.Shell")
-        bias = objShell.RegRead("HKEY_LOCAL_MACHINE\\SYSTEM\\CurrentControlSet\\Control\\TimeZoneInformation\\ActiveTimeBias")
-        If Err.Number <> 0 Then
-            Log "ConvertToUTC(" & inputDate & ") - Error reading time zone bias: " & Err.Description
-            ConvertToUTC = inputDate ' Return input as fallback
-            Err.Clear
-            Exit Function
-        End If
-    End If
-    
-    ' Validate inputTime
-    If Not IsDate(inputDate) Then
-        Log "ConvertToUTC(" & inputDate & ") - Invalid input: not a valid date/time."
-        ConvertToUTC = inputDate
-        Exit Function
-    End If
-    
-    ' Convert to UTC using minutes bias
-    utcDate = DateAdd("n", bias, inputDate)
-    If Err.Number <> 0 Then
-        Log "ConvertToUTC(" & inputDate & ") - Error during DateAdd: " & Err.Description
-        ConvertToUTC = inputDate
-        Err.Clear
-        Exit Function
-    End If
-    
-    ConvertToUTC = utcDate
-    On Error GoTo 0
-End Function
-
 Function IsInArray(valToCheck, arr)
     Dim i
     For i = LBound(arr) To UBound(arr)
@@ -913,19 +877,6 @@ Function GetArgValue(argName)
         End If
     Next
     GetArgValue = ""
-End Function
-
-' Returns a timestamp in format HH:MM:SS.mmm
-Function Timestamp()
-    Dim t
-    t = Timer ' e.g., 45296.234
-    
-    Dim hours, minutes, seconds, milliseconds
-    hours = Int(t \ 3600)
-    minutes = Int((t Mod 3600) \ 60)
-    seconds = Int(t Mod 60)
-    milliseconds = Int((t - Int(t)) * 1000)
-    timestamp = Right("0" & hours, 2) & ":" & Right("0" & minutes, 2) & ":" & Right("0" & seconds, 2) & "." & Right("00" & milliseconds, 3)
 End Function
 
 ' Checks if a WO contains a skip condition. Returns False if no skip condition in WO, true if at least one skip condition in WO. 
