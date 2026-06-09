@@ -567,6 +567,10 @@ Function Confirm_WO(wo, mitarbeiter, dauerInStunden, startzeit, endzeit, massnah
     SafeSetText "wnd[0]/usr/ctxtAFRUD-ISDZ", TimeValue(startzeit) ' work start time
     SafeSetText "wnd[0]/usr/ctxtAFRUD-IEDD", DateValue(endzeit) ' work end day
     SafeSetText "wnd[0]/usr/ctxtAFRUD-IEDZ", TimeValue(endzeit) ' work end time
+    ' unit for actual work and actual duration should always be hours (H) - usually is by default, but sometimes not (e.g. when work is planned in days). So set here to be sure
+    SafeSetText "wnd[0]/usr/ctxtAFRUD-ISMNU", "H"
+    SafeSetText "wnd[0]/usr/ctxtAFRUD-OFMNU", "H"
+    SafeSetText "wnd[0]/usr/ctxtAFRUD-IDAUE", "H"
     If finalConfirmation Then
         SafeSetText "wnd[0]/usr/txtAFRUD-OFMNW_2", "0" ' Remaining work
         SafeSetSelected "wnd[0]/usr/chkAFRUD-AUERU", True ' Final confirmation
