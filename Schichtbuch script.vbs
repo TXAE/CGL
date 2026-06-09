@@ -1125,7 +1125,9 @@ Function IsCachedRowEmpty(rowIndex)
             Exit Function
         End If
     Next
-
+    
+    'CleanupAndTerminate "IsCachedRowEmpty: Row " & rowIndex & " is empty. This should not happen for the rows being processed in the main loop. Please check the data in the Excel file and the logic of the script."
+    
     IsCachedRowEmpty = True
 End Function
 
