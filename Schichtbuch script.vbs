@@ -494,11 +494,11 @@ Function Check_if_WO_is_ready_for_script(wo_Nr)
     End If
     
     Dim sysStatus : sysStatus = GetSysStatus()
-    If InStr(sysStatus, "TECO") > 0 Then
+    If InStr(sysStatus, "TECO") > 0 Or InStr(sysStatus, "TABG") > 0 Then
         Log "WO " & wo_Nr & " already completed."
         WriteToExcel i, column_in_excel_where_to_put_message, "WO " & wo_Nr & " already completed.", False
         Exit Function
-    ElseIf InStr(sysStatus, "CLSD") > 0 Then
+    ElseIf InStr(sysStatus, "CLSD") > 0 Or InStr(sysStatus, "ABGS") > 0 Then
         Log "WO " & wo_Nr & " already closed."
         WriteToExcel i, column_in_excel_where_to_put_message, "WO " & wo_Nr & " already closed.", False
         Exit Function
@@ -508,7 +508,13 @@ Function Check_if_WO_is_ready_for_script(wo_Nr)
         If needs_TECO <> "" Then WriteToExcel i, column_in_excel_where_to_put_message, needs_TECO, False
         Exit Function
     End If
-    If InStr(sysStatus, "REL ") > 0 And InStr(sysStatus, "RELR") = 0 Then ' released (REL) & NOT release rejected (RELR) & NOT technically completed (not TECO) & NOT Confirmed (not CNF)
+    
+    ' REL  = Released (EN)
+    ' FREI = Freigegeben (DE)
+    ' RELR = Release Rejected (EN)
+    ' FRAB = Freigabe abgelehnt (DE)
+    If (InStr(sysStatus, "REL ") > 0 Or InStr(sysStatus, "FREI ") > 0) _
+       And (InStr(sysStatus, "RELR") = 0 And InStr(sysStatus, "FRAB") = 0) Then
         Log "WO " & wo_Nr & " released (REL) & NOT technically completed (not TECO) & NOT Confirmed (not CNF)."
     Else
         Log "WO " & wo_Nr & " NOT yet released (but also neither confirmed nor complete). Releasing WO now..."
@@ -581,7 +587,7 @@ Function Confirm_WO(wo, mitarbeiter, dauerInStunden, startzeit, endzeit, massnah
             "Putting full confirmation text into long text editor instead, so that no information is lost. " & vbCrLf & _
             "What was done (confirmation text) length: " & Len(massnahme) & vbCrLf & _
             "What was done (confirmation text): " & massnahme
-        SafePress "wnd[0]/usr/btn*AFRUD-LTXA1"
+        SafePress "wnd[0]/usr/btn*AFRUD-LTXA1" ' TODO: NOT FOUND WHEN SAP SET TO GERMAN
         
         Dim remainingText, currentChunk, counter
         remainingText = massnahme
