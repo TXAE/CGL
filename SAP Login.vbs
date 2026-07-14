@@ -122,6 +122,9 @@ Sub GetCredentials(ByRef username, ByRef password)
     'WScript.Echo "Credential Manager output: " & vbCrLf & output
     If InStr(output, "|") > 0 Then
         username = Split(output, "|")(0)
+        'WScript.Echo Now() & "- username: " & username
+        username = RemovePrefix(username)
+        'WScript.Echo "remove eu prefix output: " & username
         password = Split(output, "|")(1)
         Exit Sub
     End If
@@ -143,6 +146,16 @@ Sub GetCredentials(ByRef username, ByRef password)
         WScript.Quit
     End If
 End Sub
+
+' ============================================================================
+' REMOVE PREFIX (e.g. "EU\")
+' ============================================================================
+Function RemovePrefix(str)
+    If Len(str) >= 3 And Mid(str, 3, 1) = "\" Then
+        str = Mid(str, 4)
+    End If
+    RemovePrefix = str
+End Function
 
 ' ============================================================================
 ' SAP LOGIN STARTUP
