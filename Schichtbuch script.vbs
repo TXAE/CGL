@@ -485,10 +485,8 @@ Function Check_if_WO_is_ready_for_script(wo_Nr)
     Check_if_WO_is_ready_for_script = False
     SafeStartTransaction "IW32"
     SafeSetText "wnd[0]/usr/ctxtCAUFVD-AUFNR", wo_Nr
-    SafeSendVKey "wnd[0]", 0
-    Dim returnValueFromSAP : returnValueFromSAP = SafeGetText("wnd[0]/sbar") ' attach return value from SAP confirmation number
+    Dim returnValueFromSAP : returnValueFromSAP = SafeSendVKey "wnd[0]", 0
     If returnValueFromSAP <> "" Then
-        Log "SAP returned: " & returnValueFromSAP
         WriteToExcel i, column_in_excel_where_to_put_message, returnValueFromSAP, False
         Exit Function
     End If
@@ -1309,9 +1307,10 @@ Sub SafeStartTransaction(transactionCode)
     On Error GoTo 0
 End Sub
 
-' Safely send a virtual key to an SAP window. Terminates on error with a clear message.
+' Safely send a virtual key to an SAP window. 
+' Terminates on error with a clear message. Returns the SAP status bar text after sending the key if status bar text not empty.
 ' Usage: SafeSendVKey "wnd[0]", 0
-Sub SafeSendVKey(windowPath, key)
+Function SafeSendVKey(windowPath, key)
     On Error Resume Next
     Dim wnd
     Set wnd = SafeFindById(windowPath)
@@ -1324,8 +1323,13 @@ Sub SafeSendVKey(windowPath, key)
             "This may indicate the SAP GUI is not responding or the session ended. Terminating script..."
         CleanupAndTerminate errMsg
     End If
+    Dim returnValueFromSAP : returnValueFromSAP = SafeGetText("wnd[0]/sbar") ' get return value from SAP status bar
+    If returnValueFromSAP <> "" Then
+        Log "After sending VKey: '" & key & "' to windowPath '" & windowPath & "', SAP returned: " & returnValueFromSAP
+        SafeSendVKey = returnValueFromSAP
+    End If
     On Error GoTo 0
-End Sub
+End Function
 
 ' Safely get the .text property of an SAP control. Terminates on error.
 Function SafeGetText(objectPath)
