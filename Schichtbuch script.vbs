@@ -3,6 +3,15 @@
 ' This script parses through the spreadsheet, detects logged work in the spreadsheet that is not yet logged in SAP
 ' and can log the work in SAP (either fully automatic or asks user to confirm every single SAP interaction, depending on parameter)
 Option Explicit ' forces to declare all variables with Dim, Private, or Public
+' Constants for keys that are sent to SAP GUI so that the script is more readable and maintainable
+Const Enter         = 0  ' Enter key
+Const F3            = 3  ' F3           - back in SAP
+Const F8            = 8  ' F8           - execute in SAP
+Const CTRL_plus_S   = 11 ' CTRL+S       - save in SAP
+Const Shift_plus_F6 = 18 ' Shift+F6     - opens Parameters in Tcode IW41
+Const CTRL_plus_F1  = 25 ' CTRL+F1      - often releases the order
+Const CTRL_plus_F11 = 35 ' CTRL+F11     - opens Document Flow in SAP
+Const CTRL_plus_F12 = 36 ' CTRL+F12     - sets order to TECO in SAP
 Dim userName, g_logFilePath, logFile, filePath, excelApp, workbook, sheet1, sheet2, lastRow, lastCol, loadedFromMainScript, fso, file, code, session, autoConfirmResponse, argFilePath, argUseCurrentExcel, argAutoConfirm
 Dim sheet1_cached, sheet2_cached, g_timezoneBias, g_statusBuffer(), prevScreenUpdating, prevCalculation, column_in_excel_where_to_put_message, done_text_from_excel, cancelled_text_from_excel, SAP_plantcode
 initialize()
@@ -68,13 +77,13 @@ For i = 2 To lastRow + 10 ' Assuming row 1 is header, iterate through 10 extra r
                         ' Cancel the WO in SAP
                         SafeStartTransaction "IW32"
                         SafeSetText "wnd[0]/usr/ctxtCAUFVD-AUFNR", WO_Nr
-                        SafeSendVKey "wnd[0]", 0
+                        SafeSendVKey "wnd[0]", Enter
                         ' Set User Status
                         SafePress "wnd[0]/usr/subSUB_ALL:SAPLCOIH:3001/ssubSUB_LEVEL:SAPLCOIH:1100/subSUB_KOPF:SAPLCOIH:1102/btn%#AUTOTEXT001"
                         ' Select CNCL Cancelled
                         SafeSetSelected "wnd[1]/usr/tblSAPLBSVATC_EO/chkJ_STMAINT-ANWSO[0,2]", True
-                        SafeSendVKey "wnd[1]", 0 ' Enter
-                        SafeSendVKey "wnd[0]", 11 ' CTRL+S saves the order
+                        SafeSendVKey "wnd[1]", Enter
+                        SafeSendVKey "wnd[0]", CTRL_plus_S ' CTRL+S saves the order
                         Dim msgAftercancel : msgAftercancel = "Cancelled"
                         If autoConfirmResponse = vbNo Then msgAftercancel = msgAftercancel & " because user requested to"
                         Dim needs_TECO : needs_TECO = Check_if_WO_needs_TECO(wo_Nr)
@@ -157,7 +166,7 @@ For i = 2 To lastRow + 10 ' Assuming row 1 is header, iterate through 10 extra r
                         SafeStartTransaction "IW33"
                         ' can use any WO to get to the plant code, so don't put any WO here - this will SAP use the last one
                         ' TODO: Fails if no WO was opened in this SAP session before. In that case, maybe we can read the plant code from the first few rows in Excel and then search for a WO of that plant code to open here?
-                        SafeSendVKey "wnd[0]", 0
+                        SafeSendVKey "wnd[0]", Enter
                         SAP_plantcode = SafeGetText("wnd[0]/usr/subSUB_ALL:SAPLCOIH:3001/ssubSUB_LEVEL:SAPLCOIH:1100/tabsTS_1100/tabpIHKZ/ssubSUB_AUFTRAG:SAPLCOIH:1120/subHEADER:SAPLCOIH:0154/txtCAUFVD-IWERK")
                     End If
 
@@ -177,7 +186,7 @@ For i = 2 To lastRow + 10 ' Assuming row 1 is header, iterate through 10 extra r
                     SafeSetText "wnd[0]/usr/ctxtDATUV", "" ' Period - LOW
                     SafeSetText "wnd[0]/usr/ctxtDATUB", "" ' Period - HIGH
                     SafeSetText "wnd[0]/usr/ctxtSWERK-LOW", SAP_plantcode
-                    SafeSendVKey "wnd[0]", 8 ' Execute (F8)
+                    SafeSendVKey "wnd[0]", F8 ' Execute (F8)
 
                     Dim grid, rowCount, colCount, ord, r, c
                     Set grid = SafeFindById("wnd[0]/usr/cntlGRID1/shellcont/shell")
@@ -516,8 +525,8 @@ Function Check_if_WO_is_ready_for_script(wo_Nr)
         Log "WO " & wo_Nr & " released (REL) & NOT technically completed (not TECO) & NOT Confirmed (not CNF)."
     Else
         Log "WO " & wo_Nr & " NOT yet released (but also neither confirmed nor complete). Releasing WO now..."
-        SafeSendVKey "wnd[0]", 25 ' CTRL+F1 releases the order
-        SafeSendVKey "wnd[0]", 11 ' CTRL+S saves the order
+        SafeSendVKey "wnd[0]", CTRL_plus_F1 ' CTRL+F1 releases the order
+        SafeSendVKey "wnd[0]", CTRL_plus_S ' CTRL+S saves the order
     End If
     Log "WO " & wo_Nr & " ready for script."
     Check_if_WO_is_ready_for_script = True
@@ -534,9 +543,9 @@ Function Confirm_WO(wo, mitarbeiter, dauerInStunden, startzeit, endzeit, massnah
 
     SafeStartTransaction "IW41"
     ' enable Parameters > Goods movements > all components - see https://cargillonline.sharepoint.com/:i:/r/sites/SAPSUBERLIN/Shared%20Documents/Allgemeines/Anleitungen/Anwendung%20-%20Maintenance%20%26%20Reliability/Korrektive%20Instandhaltung%20(Currative%20Maintenance)/6_Arbeitszeitbest%C3%A4tigung%20(Time%20conformation)/Materialaustrag_Parameter-Einstellung.png
-    SafeSendVKey "wnd[0]", 18 ' opens Parameters
+    SafeSendVKey "wnd[0]", Shift_plus_F6 ' Shift+F6 opens Parameters
     SafeSetSelected "wnd[1]/usr/chkTCORU-ACOMP", True ' ticks Goods movements > all components
-    SafeSendVKey "wnd[1]", 0 ' enter
+    SafeSendVKey "wnd[1]", Enter
 
     SafeSetText "wnd[0]/usr/ctxtCORUF-AUFNR", wo
     ' Set operation number from excel column Q
@@ -549,7 +558,7 @@ Function Confirm_WO(wo, mitarbeiter, dauerInStunden, startzeit, endzeit, massnah
         SafeFindById("wnd[0]/usr/txtCORUF-VORNR").text = planned_operation_from_excel ' column Q = 17
     End If
     
-    SafeSendVKey "wnd[0]", 0 'enter
+    SafeSendVKey "wnd[0]", Enter
 
 
     Dim personnelNo, duration
@@ -609,11 +618,11 @@ Function Confirm_WO(wo, mitarbeiter, dauerInStunden, startzeit, endzeit, massnah
             remainingText = Mid(remainingText, 73)
             counter = counter + 1
         Loop
-        SafeSendVKey "wnd[0]", 3 ' F3 to go back from document flow to WO in SAP GUI
+        SafeSendVKey "wnd[0]", F3 ' F3 to go back from document flow to WO in SAP GUI
         ' Can't check for SafeGetText("wnd[0]/sbar") <> "" here because SAP always outputs 'Text changes were transferred' to status bar (sbar) in case of long text input
     Else
         SafeSetText "wnd[0]/usr/txtAFRUD-LTXA1", massnahme ' confirm text short - 40 char max
-        SafeSendVKey "wnd[0]", 0 ' enter so user can see name next to personnel number and to check for error from SAP, see below
+        SafeSendVKey "wnd[0]", Enter ' enter so user can see name next to personnel number and to check for error from SAP, see below
         If SafeGetText("wnd[0]/sbar") <> "" Then
             CleanupAndTerminate "ERROR: Unable to confirm WO - " & SafeGetText("wnd[0]/sbar")
         End If
@@ -634,8 +643,8 @@ Function Confirm_WO(wo, mitarbeiter, dauerInStunden, startzeit, endzeit, massnah
     Select Case ConfirmationResponse
         Case vbYes
             'Confirm_WO = SafeFindById("wnd[0]/usr/txtAFVGD-RUECK").text ' save the confirmation number - must do so before enter or save, otherwise this number might not be accesible bc we're in another menu
-            SafeSendVKey "wnd[0]", 8 'F8 to open Goods movements overview
-            SafeSendVKey "wnd[0]", 11 ' Saves the confirmation OR confirmation with goods movement
+            SafeSendVKey "wnd[0]", F8 'F8 to open Goods movements overview
+            SafeSendVKey "wnd[0]", CTRL_plus_S ' Saves the confirmation OR confirmation with goods movement
             'Confirm_WO = Confirm_WO & " // " & 'SafeFindById("wnd[0]/sbar").text ' attach return value from SAP confirmation number e.g. "Number of confirmations saved for order 417052748: 1"
             Confirm_WO = "confirmed"
         Case vbNo
@@ -657,7 +666,7 @@ End Function
 Function Check_if_WO_needs_TECO(wo_Nr)
     SafeStartTransaction "IW32"
     SafeSetText "wnd[0]/usr/ctxtCAUFVD-AUFNR", wo_Nr
-    SafeSendVKey "wnd[0]", 0
+    SafeSendVKey "wnd[0]", Enter
     Dim skipReason : skipReason = Check_if_WO_contains_skip_condition()
     If skipReason <> "" Then
         Check_if_WO_needs_TECO = SkipReason
@@ -683,8 +692,8 @@ Function Check_if_WO_needs_TECO(wo_Nr)
     End If
     Select Case CNF_Not_CAPR_response
         Case vbYes
-            SafeSendVKey "wnd[0]", 36 ' CTRL+F12
-            SafeSendVKey "wnd[0]", 0 ' Enter
+            SafeSendVKey "wnd[0]", CTRL_plus_F12
+            SafeSendVKey "wnd[0]", Enter
             
             Dim msgAfterTECO : msgAfterTECO = "TECO'd"
             If autoConfirmResponse = vbNo Then msgAfterTECO = msgAfterTECO & " because user requested to"
@@ -1229,7 +1238,7 @@ Function Check_if_WO_contains_skip_condition()
     End If
     Log "1. skip condition looks good. Next checking..."
     Log "2. skip condition: at least one purchase. Browsing document flow..."
-    SafeSendVKey "wnd[0]", 35 'CTRL+F11 (Document Flow)
+    SafeSendVKey "wnd[0]", CTRL_plus_F11 'CTRL+F11 (Document Flow)
 
     Dim tree, index, key, itemText
     Set tree = SafeFindById("wnd[0]/usr/shell/shellcont[1]/shell[1]")
@@ -1262,7 +1271,7 @@ Function Check_if_WO_contains_skip_condition()
         
         index = index + 1
     Loop
-    SafeSendVKey "wnd[0]", 3 ' F3 to go back from document flow to WO in SAP GUI
+    SafeSendVKey "wnd[0]", F3 ' F3 to go back from document flow to WO in SAP GUI
     SafeSelect "wnd[0]/usr/subSUB_ALL:SAPLCOIH:3001/ssubSUB_LEVEL:SAPLCOIH:1101/tabsTS_1100/tabpIHKZ" ' Select HeaderData tab again to get back to initial state
 End Function
 
@@ -1309,7 +1318,7 @@ End Sub
 
 ' Safely send a virtual key to an SAP window. 
 ' Terminates on error with a clear message. Returns the SAP status bar text after sending the key if status bar text not empty.
-' Usage: SafeSendVKey "wnd[0]", 0
+' Usage: SafeSendVKey "wnd[0]", Enter
 Function SafeSendVKey(windowPath, key)
     On Error Resume Next
     Dim wnd
