@@ -485,7 +485,7 @@ Function Check_if_WO_is_ready_for_script(wo_Nr)
     Check_if_WO_is_ready_for_script = False
     SafeStartTransaction "IW32"
     SafeSetText "wnd[0]/usr/ctxtCAUFVD-AUFNR", wo_Nr
-    Dim returnValueFromSAP : returnValueFromSAP = SafeSendVKey "wnd[0]", 0
+    Dim returnValueFromSAP : returnValueFromSAP = SafeSendVKey("wnd[0]", 0)
     If returnValueFromSAP <> "" Then
         WriteToExcel i, column_in_excel_where_to_put_message, returnValueFromSAP, False
         Exit Function
