@@ -1314,10 +1314,11 @@ Function SafeSendVKey(windowPath, key)
     On Error Resume Next
     Dim wnd
     Set wnd = SafeFindById(windowPath)
+    Log "sendKey " & SAPVKeyName(key) & " to windowPath '" & windowPath & "'"
     wnd.sendVKey key
     If Err.Number <> 0 Then
         Dim errMsg
-        errMsg = "CRITICAL ERROR: sendVKey failed for '" & windowPath & "' with key: " & key & vbCrLf & vbCrLf & _
+        errMsg = "CRITICAL ERROR: sendVKey failed for '" & windowPath & "' with key: " & SAPVKeyName(key) & vbCrLf & vbCrLf & _
             "Error Number: " & Err.Number & vbCrLf & _
             "Error Description: " & Err.Description & vbCrLf & vbCrLf & _
             "This may indicate the SAP GUI is not responding or the session ended. Terminating script..."
@@ -1325,10 +1326,30 @@ Function SafeSendVKey(windowPath, key)
     End If
     Dim returnValueFromSAP : returnValueFromSAP = SafeGetText("wnd[0]/sbar") ' get return value from SAP status bar
     If returnValueFromSAP <> "" Then
-        Log "After sending VKey: '" & key & "' to windowPath '" & windowPath & "', SAP returned: " & returnValueFromSAP
+        Log "After sending VKey: '" & SAPVKeyName(key) & "' to windowPath '" & windowPath & "', SAP returned: " & returnValueFromSAP
         SafeSendVKey = returnValueFromSAP
     End If
     On Error GoTo 0
+End Function
+
+' Return a readable name for an SAP GUI virtual key.
+Function SAPVKeyName(key)
+    Select Case key
+        Case 0
+            SAPVKeyName = "Enter"
+        Case 1, 2, 3, 4, 5, 6, 7, 8, 9, 10
+            SAPVKeyName = "F" & key
+        Case 11
+            SAPVKeyName = "Ctrl+S"
+        Case 12
+            SAPVKeyName = "F12"
+        Case 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24
+            SAPVKeyName = "Shift+F" & (key - 12)
+        Case 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36
+            SAPVKeyName = "Ctrl+F" & (key - 24)
+        Case Else
+            SAPVKeyName = "Unknown (" & key & ")"
+    End Select
 End Function
 
 ' Safely get the .text property of an SAP control. Terminates on error.
