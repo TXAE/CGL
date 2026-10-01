@@ -1307,12 +1307,15 @@ Function Check_if_WO_contains_skip_condition()
         'selectItemParameter = key & ", &Hierarchy"
         'Log "selectItemParameter:" & selectItemParameter
         On Error Resume Next
+        Err.Clear
         itemText = tree.getItemText(key, "&Hierarchy")
         If Err.Number <> 0 Then
             Log "   " & index & " => No skip condition found."
             '"Error at key '" & key & "'" & vbCrLf & _
             '"Error Number: " & Err.Number & vbCrLf & _
             '"Description: " & Err.Description
+            Err.Clear
+            On Error GoTo 0
             Exit Do
         End If
         On Error GoTo 0
