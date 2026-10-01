@@ -269,6 +269,7 @@ For i = 2 To lastRow + 10 ' Assuming row 1 is header, iterate through 10 extra r
                     Next
                     Log "Finished copying upcoming PMs to shift logbook."
                 End If
+                SaveWorkbook
                 CleanUpAndTerminate "Finished script execution after detecting " & emptyRowsUntilDone & " empty rows."
             End If
         Else
@@ -304,6 +305,7 @@ For i = 2 To lastRow + 10 ' Assuming row 1 is header, iterate through 10 extra r
     End If
 Next
 
+SaveWorkbook
 CleanupAndTerminate "Finished."
 
 
@@ -1542,6 +1544,25 @@ Function GetCellValueStrict(grid, rowIndex, techId)
     On Error GoTo 0
     GetCellValueStrict = v
 End Function
+
+' Stops the script gracefully, performing cleanup and logging the last message to the user.
+Sub SaveWorkbook()
+    Dim saveErrorNumber, saveErrorDescription
+
+    On Error Resume Next
+    Err.Clear
+    workbook.Save
+    If Err.Number <> 0 Then
+        saveErrorNumber = Err.Number
+        saveErrorDescription = Err.Description
+        Err.Clear
+        On Error GoTo 0
+        CleanupAndTerminate "ERROR: Could not save workbook '" & filePath & "'." & vbCrLf & _
+            "VBScript Error " & saveErrorNumber & ": " & saveErrorDescription
+    End If
+    On Error GoTo 0
+    Log "Saved workbook: " & filePath
+End Sub
 
 ' Stops the script gracefully, performing cleanup and logging the last message to the user.
 Sub CleanupAndTerminate(LastMessageToUser)
