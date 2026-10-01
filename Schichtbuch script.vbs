@@ -463,7 +463,11 @@ Sub initialize()
     On Error Resume Next
     sheet1_cached = sheet1.Range(sheet1.Cells(1, 1), sheet1.Cells(lastRow, lastCol)).Value
     If Err.Number <> 0 Then CleanupAndTerminate "=== ERROR === Bulk read of sheet1 range failed."
-    sheet2_cached = sheet2.Range(sheet2.Cells(1, 1), sheet2.Cells(lastRow, lastCol)).Value
+    Dim sheet2LastRow
+    sheet2LastRow = sheet2.Cells(sheet2.Rows.Count, 1).End(-4162).Row ' -4162 = xlUp
+    If sheet2LastRow < 5 Then CleanupAndTerminate "ERROR: sheet2 has less than 5 rows. Please check that the shift logbook Excel file has data in the second sheet." & vbCrLf & _
+        "sheet2LastRow: " & sheet2LastRow
+    sheet2_cached = sheet2.Range(sheet2.Cells(1, 1), sheet2.Cells(sheet2LastRow, 5)).Value ' Employee data in columns A:B; status labels in column E
     If Err.Number <> 0 Then CleanupAndTerminate "=== ERROR === Bulk read of sheet2 range failed."
     On Error GoTo 0
 
