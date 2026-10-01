@@ -397,26 +397,39 @@ Sub initialize()
         Log "using user-selected excel path=" & filePath
     End If
     
+    Dim wb, workbookAlreadyOpen, candidateWorkbook, sameNameCount
+    workbookAlreadyOpen = False
+    sameNameCount = 0
+    Set candidateWorkbook = Nothing
     If excelApp.Workbooks.Count <> 0 Then
-        Log "Checking if shift logbook excel file is already open in one of the existing " & excelApp.Workbooks.Count & " excel-instances..."
-        Dim wb, workbookAlreadyOpen : workbookAlreadyOpen = False
+        Log "Checking if shift logbook excel file is already open in one of the existing " & excelApp.Workbooks.Count & " workbooks..."
         For Each wb In excelApp.Workbooks
-            If LCase(wb.FullName) = LCase(filePath) Then
+            If NormalizeWorkbookPath(wb.FullName) = NormalizeWorkbookPath(filePath) Then
                 Log "Shift logbook excel file is already open. Using the already opened shift logbook excel to avoid reopening it..."
                 Set workbook = wb
                 workbookAlreadyOpen = True
                 Exit For
+            ElseIf LCase(wb.Name) = LCase(WorkbookFileName(filePath)) Then
+                Set candidateWorkbook = wb
+                sameNameCount = sameNameCount + 1
             End If
         Next
+        If Not workbookAlreadyOpen And sameNameCount = 1 Then
+            Log "SharePoint path differs from Excel's workbook path. Reusing the uniquely matching open workbook: " & candidateWorkbook.Name
+            Set workbook = candidateWorkbook
+            workbookAlreadyOpen = True
+        End If
     End If
 
     If Not workbookAlreadyOpen Then
         On Error Resume Next
         Set workbook = excelApp.Workbooks.Open(filePath)
         If Err.Number <> 0 Or workbook Is Nothing Then
+            Dim openErrorDescription
+            openErrorDescription = Err.Description
             Err.Clear
             CleanupAndTerminate "ERROR: Could not open workbook: " & filePath & vbCrLf & _
-                "Details: " & Err.Description
+                "Details: " & openErrorDescription
         End If
         Log "Opened: " & filePath
         On Error GoTo 0
@@ -1149,6 +1162,31 @@ Sub Log(message)
     ' Append the message to the log file
     logFile.WriteLine time_and_message
 End Sub
+
+Function NormalizeWorkbookPath(pathValue)
+    Dim normalized, queryPosition, fragmentPosition, trimPosition
+    normalized = LCase(Trim(CStr(pathValue)))
+    normalized = Replace(normalized, "\", "/")
+    normalized = Replace(normalized, "/:x:/r/", "/")
+    normalized = Replace(normalized, "%20", " ")
+    normalized = Replace(normalized, "%2f", "/")
+
+    queryPosition = InStr(normalized, "?")
+    fragmentPosition = InStr(normalized, "#")
+    trimPosition = 0
+    If queryPosition > 0 Then trimPosition = queryPosition
+    If fragmentPosition > 0 And (trimPosition = 0 Or fragmentPosition < trimPosition) Then trimPosition = fragmentPosition
+    If trimPosition > 0 Then normalized = Left(normalized, trimPosition - 1)
+
+    NormalizeWorkbookPath = normalized
+End Function
+
+Function WorkbookFileName(pathValue)
+    Dim normalized, separatorPosition
+    normalized = NormalizeWorkbookPath(pathValue)
+    separatorPosition = InStrRev(normalized, "/")
+    WorkbookFileName = Mid(normalized, separatorPosition + 1)
+End Function
 
 ' Gets the value of an argument "argName" passed to the script at runtime
 Function GetArgValue(argName)
