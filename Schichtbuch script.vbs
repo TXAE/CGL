@@ -690,9 +690,9 @@ Function Check_if_WO_needs_TECO(wo_Nr)
     SafeStartTransaction "IW32"
     SafeSetText "wnd[0]/usr/ctxtCAUFVD-AUFNR", wo_Nr
     SafeSendVKey "wnd[0]", Enter
-    Dim skipReason : skipReason = Check_if_WO_contains_skip_condition()
-    If skipReason <> "" Then
-        Check_if_WO_needs_TECO = SkipReason
+    Dim WO_skip_condition : WO_skip_condition = Check_if_WO_contains_skip_condition()
+    If WO_skip_condition <> "" Then
+        Check_if_WO_needs_TECO = WO_skip_condition
         Exit Function
     End If
 
