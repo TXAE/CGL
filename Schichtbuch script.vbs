@@ -1078,16 +1078,31 @@ Sub WriteToExcel(row, column, message, redBackgroundAndBoldText)
 
     Dim existingValue : existingValue = SafeCellAccess(sheet1, row, column)
     If existingValue = "" Then
-        sheet1.Cells(row, column).Value = message
+        Dim writeAttempt, writeSucceeded, writeError
+        writeSucceeded = False
+        For writeAttempt = 1 To 2
+            Err.Clear
+            sheet1.Cells(row, column).Value = message
+            If Err.Number = 0 Then
+                writeSucceeded = True
+                Exit For
+            Else
+                writeError = Err.Description
+                Err.Clear
+                If writeAttempt < 2 Then
+                    Log "Excel write attempt " & writeAttempt & " failed: " & writeError & ". Retrying after 2s."
+                    WScript.Sleep 2000
+                End If
+            End If
+        Next
+        If Not writeSucceeded Then
+            CleanupAndTerminate "Excel write failed after " & writeAttempt - 1 & " attempts: " & writeError
+        End If
+        If writeAttempt > 1 Then Log "Excel write succeeded on retry"
     Else
         Log "WARNING! Not overwriting existing value in Excel at row " & row & ", column " & column & ". Existing value: '" & existingValue & "'"
     End If
     
-    ' Check for error
-    If Err.Number <> 0 Then
-        Log "Write failed: " & Err.Description
-        Err.Clear
-    End If
     On Error GoTo 0
 End Sub
 
