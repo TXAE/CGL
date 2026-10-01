@@ -423,7 +423,7 @@ Sub initialize()
 
     If Not workbookAlreadyOpen Then
         On Error Resume Next
-        Set workbook = excelApp.Workbooks.Open(filePath)
+        Set workbook = excelApp.Workbooks.Open(filePath, 0, False, , , , True)
         If Err.Number <> 0 Or workbook Is Nothing Then
             Dim openErrorDescription
             openErrorDescription = Err.Description
@@ -433,6 +433,10 @@ Sub initialize()
         End If
         Log "Opened: " & filePath
         On Error GoTo 0
+    End If
+    If workbook.ReadOnly Then
+        CleanupAndTerminate "ERROR: Workbook opened in Read-Only mode and cannot be updated: " & workbook.FullName & vbCrLf & _
+            "Close any other instance using this workbook and verify that you have edit access, then try again."
     End If
     Set sheet1 = workbook.sheets(1)
     Set sheet2 = workbook.sheets(2)
