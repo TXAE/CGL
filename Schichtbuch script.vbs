@@ -892,9 +892,14 @@ End Function
 
 'In Excel, time values are stored as fractions of a day. So when you extract a time like 0.416666666666667 from Excel, it actually represents: 0.416666666666667 × 24 = 10 hours - This function then returns 10:00:00.
 Function ConvertExcelFractionToTime(excelTime)
-    ' Handle null or empty input
-    If IsNull(excelTime) Or Trim(CStr(excelTime)) = "" Then
-        Log "ExcelFractionToTime(" & excelTime & ") - parameter is null or empty"
+    ' Handle null input before converting to a string
+    If IsNull(excelTime) Then
+        Log "ExcelFractionToTime - parameter is null"
+        ConvertExcelFractionToTime = Null
+        Exit Function
+    End If
+    If Trim(CStr(excelTime)) = "" Then
+        Log "ExcelFractionToTime - parameter is empty"
         ConvertExcelFractionToTime = Null
         Exit Function
     End If
@@ -932,9 +937,14 @@ End Function
 Function SafeCDate(value)
     Dim result
 
-    ' Check for empty or null input
-    If IsNull(value) Or Trim(CStr(value)) = "" Then
-        Log "SafeCDate(" & value & ") - parameter is null or empty"
+    ' Check for null input before converting to a string
+    If IsNull(value) Then
+        Log "SafeCDate - parameter is null"
+        SafeCDate = Null
+        Exit Function
+    End If
+    If Trim(CStr(value)) = "" Then
+        Log "SafeCDate - parameter is empty"
         SafeCDate = Null
         Exit Function
     End If
