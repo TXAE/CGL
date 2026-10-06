@@ -13,7 +13,7 @@ Const CTRL_plus_F1  = 25 ' CTRL+F1      - often releases the order
 Const CTRL_plus_F11 = 35 ' CTRL+F11     - opens Document Flow in SAP
 Const CTRL_plus_F12 = 36 ' CTRL+F12     - sets order to TECO in SAP
 Dim userName, g_logFilePath, logFile, filePath, excelApp, workbook, sheet1, sheet2, lastRow, lastCol, loadedFromMainScript, fso, file, code, session, autoConfirmResponse, argFilePath, argUseCurrentExcel, argAutoConfirm
-Dim sheet1_cached, sheet2_cached, g_timezoneBias, g_statusBuffer(), prevScreenUpdating, prevCalculation, column_in_excel_where_to_put_message, done_text_from_excel, cancelled_text_from_excel, SAP_plantcode
+Dim sheet1_cached, sheet2_cached, g_timezoneBias, g_statusBuffer(), prevScreenUpdating, prevCalculation, column_in_excel_where_to_put_message, done_text_from_excel, cancelled_text_from_excel, planning_text_from_excel, SAP_plantcode
 initialize()
 
 ' DEBUGGING SETTINGS
@@ -57,7 +57,7 @@ For i = 2 To lastRow + 10 ' Assuming row 1 is header, iterate through 10 extra r
         If Status = "" Then
             SkipReason = SkipReason & vbCrLf & " - No 'Status' for WO " & WO_Nr & " found."
         ElseIf Status = cancelled_text_from_excel And SkipReason = "" Then
-            Log "Row " & i & " - WO " & WO_Nr & " is marked as cancelled in shift logbook."
+            Log "Row " & i & " - WO " & WO_Nr & " is marked as '" & cancelled_text_from_excel & "' in shift logbook."
             Dim cancel_response
             If autoConfirmResponse = vbYes Then
                 cancel_response = vbYes
@@ -74,11 +74,7 @@ For i = 2 To lastRow + 10 ' Assuming row 1 is header, iterate through 10 extra r
                 Case vbYes
                     ' Check & make sure WO is released!
                     If Check_if_WO_is_ready_for_script(WO_Nr) Then
-                        ' Cancel the WO in SAP
-                        SafeStartTransaction "IW32"
-                        SafeSetText "wnd[0]/usr/ctxtCAUFVD-AUFNR", WO_Nr
-                        SafeSendVKey "wnd[0]", Enter
-                        ' Set User Status
+                        ' Press button "Set User Status"
                         SafePress "wnd[0]/usr/subSUB_ALL:SAPLCOIH:3001/ssubSUB_LEVEL:SAPLCOIH:1100/subSUB_KOPF:SAPLCOIH:1102/btn%#AUTOTEXT001"
                         ' Select CNCL Cancelled
                         SafeSetSelected "wnd[1]/usr/tblSAPLBSVATC_EO/chkJ_STMAINT-ANWSO[0,2]", True
@@ -96,6 +92,42 @@ For i = 2 To lastRow + 10 ' Assuming row 1 is header, iterate through 10 extra r
                     Log "WO " & wo_Nr & " not cancelled. User clicked no when asked to cancel, so I did not cancel. Proceeding with the script..."
                 Case vbCancel
                     CleanupAndTerminate "WO " & wo_Nr & " not cancelled. User clicked cancel, so terminating script."
+            End Select
+        ElseIf Status = planning_text_from_excel And SkipReason = "" Then
+            Log "Row " & i & " - WO " & WO_Nr & " is marked as '" & planning_text_from_excel & "' in shift logbook. "
+            Dim planning_response
+            If autoConfirmResponse = vbYes Then
+                planning_response = vbYes
+            Else
+                planning_response = MsgBox("Do you want to plan WO " & wo_Nr & " in SAP?" & vbCrLf & vbCrLf & _
+                    "Yes:" & vbCrLf & _
+                    "will set user status as 80:QCHK:Quality Check Required for the WO as you see it on your screen and proceed with the script." & vbCrLf & vbCrLf & _
+                    "No:" & vbCrLf & _
+                    "will NOT set the WO to planning but proceed with the script" & vbCrLf & vbCrLf & _
+                    "Cancel:" & vbCrLf & _
+                    "will NOT set the WO to planning and TERMINATE the script.", vbYesNoCancel + vbQuestion, "Plan WO " & wo_Nr & " in SAP?")
+            End If
+            Select Case planning_response
+                Case vbYes
+                    ' Check & make sure WO is released!
+                    If Check_if_WO_is_ready_for_script(WO_Nr) Then
+                        ' Press button "Set User Status"
+                        SafePress "wnd[0]/usr/subSUB_ALL:SAPLCOIH:3001/ssubSUB_LEVEL:SAPLCOIH:1100/subSUB_KOPF:SAPLCOIH:1102/btn%#AUTOTEXT001"
+                        ' Scroll to where 80:QCHK:Quality Check Required is visible
+                        SafeFindById("wnd[1]/usr/tblSAPLBSVATC_E").verticalScrollbar.position = 14
+                        ' Select 80:QCHK:Quality Check Required
+                        SafeSelect "wnd[1]/usr/tblSAPLBSVATC_E/radJ_STMAINT-ANWS[0,0]"
+                        Log "Selecting user status '" & SafeGetText("wnd[1]/usr/tblSAPLBSVATC_E/txtANWS_STONR[1,0]") & ":" & SafeGetText("wnd[1]/usr/tblSAPLBSVATC_E/txtJEST_BUF_E-ETX04[2,0]") & ":" & SafeGetText("wnd[1]/usr/tblSAPLBSVATC_E/txtJEST_BUF_E-ETX30[3,0]") & "' for WO " & wo_Nr
+                        SafeSendVKey "wnd[1]", Enter
+                        SafeSendVKey "wnd[0]", CTRL_plus_S ' CTRL+S saves the order
+                        Dim msgAfterplanning : msgAfterplanning = "Planned"
+                        If autoConfirmResponse = vbNo Then msgAfterplanning = msgAfterplanning & " because user requested to"
+                        Log msgAfterplanning
+                    End If
+                Case vbNo
+                    Log "WO " & wo_Nr & " not planned. User clicked no. Proceeding with the script..."
+                Case vbCancel
+                    CleanupAndTerminate "WO " & wo_Nr & " not planned. User clicked cancel, so terminating script."
             End Select
         End If
 
@@ -486,9 +518,10 @@ Sub initialize()
 
     done_text_from_excel = sheet2_cached(4, 5) ' cell E4 in sheet2
     cancelled_text_from_excel = sheet2_cached(5, 5) ' cell E5 in sheet2
-    Log "done_text_from_excel sheet2: '" & done_text_from_excel & "' // cancelled_text_from_excel sheet2: '" & cancelled_text_from_excel & "'"
-    If done_text_from_excel = "" Or cancelled_text_from_excel = "" Then
-        CleanupAndTerminate "ERROR: done_text_from_excel or cancelled_text_from_excel is empty. Please check that cells E4 and E5 in sheet2 of the shift logbook Excel file are filled with the correct text to indicate a done or cancelled WO in the excel."
+    planning_text_from_excel = sheet2_cached(6, 5) ' cell E6 in sheet2
+    Log "done_text_from_excel sheet2: '" & done_text_from_excel & "' // cancelled_text_from_excel sheet2: '" & cancelled_text_from_excel & "' // planning_text_from_excel sheet2: '" & planning_text_from_excel & "'"
+    If done_text_from_excel = "" Or cancelled_text_from_excel = "" Or planning_text_from_excel = "" Then
+        CleanupAndTerminate "ERROR: done_text_from_excel or cancelled_text_from_excel or planning_text_from_excel is empty. Please check that cells E4, E5 and E6 in sheet2 of the shift logbook Excel file are filled with the correct text to indicate a done, cancelled or planned WO in the excel."
     End If
     
     Log vbCrLf & "Logging in to SAP..."
@@ -514,6 +547,7 @@ Sub initialize()
 End Sub
 
 Function Check_if_WO_is_ready_for_script(wo_Nr)
+    Log "Opening WO " & wo_Nr & "in SAP T-code IW32 to check if WO " & wo_Nr & " is ready for script..."
     Check_if_WO_is_ready_for_script = False
     SafeStartTransaction "IW32"
     SafeSetText "wnd[0]/usr/ctxtCAUFVD-AUFNR", wo_Nr
