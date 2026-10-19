@@ -547,7 +547,7 @@ Sub initialize()
 End Sub
 
 Function Check_if_WO_is_ready_for_script(wo_Nr)
-    Log "Opening WO " & wo_Nr & "in SAP T-code IW32 to check if WO " & wo_Nr & " is ready for script..."
+    Log "Opening WO " & wo_Nr & " in SAP T-code IW32 to check if WO " & wo_Nr & " is ready for script..."
     Check_if_WO_is_ready_for_script = False
     SafeStartTransaction "IW32"
     SafeSetText "wnd[0]/usr/ctxtCAUFVD-AUFNR", wo_Nr
