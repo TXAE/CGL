@@ -60,15 +60,14 @@ Function SAPLogin()
     Dim username, password
     Call GetCredentials(username, password)
 
+    Dim injectExec, injectPath
+    Set injectExec = StartPowerShellFile(PS_Inject(username, username, password), injectPath)
+    
     'WScript.Echo Now() & "- Launching SAP login window..."
     Call LaunchSapFile(username)
 
-    Call WaitForWindow(username, 10000)
-    'WScript.Echo Now() & "- SAP login window active. Injecting credentials..."
-
-    ' ---- Inject credentials (PowerShell once)
     Dim injectResult
-    injectResult = InjectCredentials(username, password)
+    injectResult = FinishPowerShellFile(injectExec, injectPath)
     If InStr(injectResult, "OK") = 0 Then
         WScript.Echo "SAP login injection returned: " & vbCrLf & injectResult
         WScript.Quit
@@ -197,8 +196,31 @@ End Sub
 ' ============================================================================
 ' LOGIN FIELD INJECTION (PowerShell once)
 ' ============================================================================
-Function InjectCredentials(title, password)
-    InjectCredentials = RunPowerShellFile(PS_Inject(title, title, password))
+Function StartPowerShellFile(ByVal psCode, ByRef psPath)
+    Dim tempFolder, file
+
+    Set tempFolder = fso.GetSpecialFolder(2)
+    psPath = tempFolder & "\sap_inject_" & Replace(fso.GetTempName, ".tmp", ".ps1")
+
+    Set file = fso.CreateTextFile(psPath, True)
+    file.Write psCode
+    file.Close
+
+    Set StartPowerShellFile = shell.Exec( _
+        "powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File """ & psPath & """")
+End Function
+
+Function FinishPowerShellFile(exec, psPath)
+    Dim output, stderr
+    output = exec.StdOut.ReadAll
+    stderr = exec.StdErr.ReadAll
+
+    On Error Resume Next
+    fso.DeleteFile psPath
+    On Error GoTo 0
+
+    If Len(stderr) > 0 Then output = output & vbCrLf & "POWERSHELL STDERR:" & vbCrLf & stderr
+    FinishPowerShellFile = Trim(output)
 End Function
 
 ' ============================================================================
@@ -394,6 +416,7 @@ Function PS_Inject(title, u, p)
         "using System.Runtime.InteropServices;" & vbCrLf & _
         "public static class W {" & vbCrLf & _
         " [DllImport(""user32.dll"", CharSet=CharSet.Auto, SetLastError=true)] public static extern bool EnumWindows(EnumWindowsProc lpEnumFunc, IntPtr lParam);" & vbCrLf & _
+        " [DllImport(""user32.dll"", SetLastError=true)] public static extern bool SetForegroundWindow(IntPtr hWnd);" & vbCrLf & _
         " [DllImport(""user32.dll"", CharSet=CharSet.Auto, SetLastError=true)] public static extern bool IsWindowVisible(IntPtr hWnd);" & vbCrLf & _
         " [DllImport(""user32.dll"", CharSet=CharSet.Auto, SetLastError=true)] public static extern int GetWindowText(IntPtr hWnd, StringBuilder lpString, int nMaxCount);" & vbCrLf & _
         " [DllImport(""user32.dll"", SetLastError=true)] public static extern int GetWindowTextLength(IntPtr hWnd);" & vbCrLf & _
@@ -424,10 +447,16 @@ Function PS_Inject(title, u, p)
         "$title = '" & Replace(title, "'", "''") & "';" & vbCrLf & _
         "$user = '" & Replace(u, "'", "''") & "';" & vbCrLf & _
         "$pw = '" & Replace(p, "'", "''") & "';" & vbCrLf & _
-        "Write-Output ('Searching top-level window by title: ' + $title);" & vbCrLf & _
-        "$hWnd = [W]::FindWindowByText($title);" & vbCrLf & _
+        "$timer = [Diagnostics.Stopwatch]::StartNew();" & vbCrLf & _
+        "$hWnd = [IntPtr]::Zero;" & vbCrLf & _
+        "while ($hWnd -eq [IntPtr]::Zero -and $timer.ElapsedMilliseconds -lt 10000) {" & vbCrLf & _
+        "    $hWnd = [W]::FindWindowByText($title);" & vbCrLf & _
+        "    if ($hWnd -eq [IntPtr]::Zero) { Start-Sleep -Milliseconds 25 }" & vbCrLf & _
+        "}" & vbCrLf & _
+        "$timer.Stop();" & vbCrLf & _
         "Write-Output ('FindWindowByText returned: ' + $hWnd.ToInt64());" & vbCrLf & _
-        "if ($hWnd -eq [IntPtr]::Zero) { Write-Output 'NOTFOUND'; exit 1 }" & vbCrLf & _
+        "if ($hWnd -eq [IntPtr]::Zero) { Write-Output 'Timed out waiting for the SAP login window.'; exit 1 }" & vbCrLf & _
+        "[W]::SetForegroundWindow($hWnd) | Out-Null;" & vbCrLf & _
         "$hEdit1 = [W]::FindWindowEx($hWnd, [IntPtr]::Zero, 'Edit', $null);" & vbCrLf & _
         "Write-Output ('FindWindowEx(Edit) returned: ' + $hEdit1.ToInt64());" & vbCrLf & _
         "if ($hEdit1 -eq [IntPtr]::Zero) { Write-Output 'NO_EDITS'; exit 2 }" & vbCrLf & _
