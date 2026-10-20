@@ -74,7 +74,7 @@ Function SAPLogin()
     End If
 
     ' ---- Wait for Easy Access
-    Call WaitForWindow("SAP Easy Access", 9000)
+    Call WaitForWindow("SAP Easy Access", 12000)
 
     ' ---- Attach to SAP session
     Set session = isLoggedIntoSAP()
