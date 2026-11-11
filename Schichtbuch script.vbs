@@ -431,7 +431,7 @@ Sub initialize()
         Log "using user-selected excel path=" & filePath
     End If
     
-    Dim wb, workbookAlreadyOpen, candidateWorkbook, sameNameCount
+    Dim wb, workbookAlreadyOpen, candidateWorkbook, sameNameCount, workbookSheetCount
     workbookAlreadyOpen = False
     sameNameCount = 0
     Set candidateWorkbook = Nothing
@@ -472,9 +472,13 @@ Sub initialize()
         CleanupAndTerminate "ERROR: Workbook opened in Read-Only mode and cannot be updated: " & workbook.FullName & vbCrLf & _
             "Close any other instance using this workbook and verify that you have edit access, then try again."
     End If
+    workbookSheetCount = workbook.Sheets.Count
+    If workbookSheetCount > 2 Then
+        CleanupAndTerminate "ERROR: Workbook has " & workbookSheetCount & " sheets; this script supports a maximum of 2 sheets: " & workbook.FullName
+    End If
     Set sheet1 = workbook.sheets(1)
     Set sheet2 = workbook.sheets(2)
-    Log "Shift logbook Excel file has " & workbook.sheets.Count & " sheets. sheet1 name: " & sheet1.Name & " // sheet2 name: " & sheet2.Name
+    Log "Shift logbook Excel file has " & workbookSheetCount & " sheets. sheet1 name: " & sheet1.Name & " // sheet2 name: " & sheet2.Name
 
 
     ' === FIND LAST ROW AND COLUMN ===
