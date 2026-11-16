@@ -26,6 +26,9 @@ Dim shell, fso, session
 Set shell = CreateObject("WScript.Shell")
 Set fso = CreateObject("Scripting.FileSystemObject")
 
+Dim debugMode
+debugMode = True
+
 Dim target
 target = "TERMSRV/ceberr55mp.eu.corp.cargill.com"
 
@@ -38,55 +41,73 @@ target = "TERMSRV/ceberr55mp.eu.corp.cargill.com"
 '       - load SAP Login.vbs entirely
 '       - set loadedFromMainScript = True (flag to indicate another script is calling SAP Login.vbs
 '       - call SAPLogin()-function itself to get session-object (session object is used for automation of SAP GUI)
-Dim loadedFromAnotherScript
-If IsEmpty(loadedFromAnotherScript) Then Set session = SAPLogin()
+Dim loadedFromMainScript
+If IsEmpty(loadedFromMainScript) Then
+    OutputMessage Now() & " - Running SAPLogin() standalone"
+    Set session = SAPLogin()
+End If
 
 ' ============================================================================
 ' MAIN FUNCTION
 ' ============================================================================
 Function SAPLogin()
-
+    
+    OutputMessage Now() & " - Checking if the user is already logged into to SAP..."
     Dim session
     Set session = isLoggedIntoSAP()
-
+    
     ' ---- Already logged in → return session immediately
     If Not session Is Nothing Then
+        OutputMessage Now() & " - Session found, user is logged in. Returning existing session and maximizing window"
         session.FindById("wnd[0]").Maximize
         Set SAPLogin = session
+        OutputMessage Now() & " - End"
         Exit Function
     End If
-
+    
     ' ---- Get credentials (PowerShell once)
+    OutputMessage Now() & " - User not already logged into SAP. Checking if there are saved credentials..."
     Dim username, password
     Call GetCredentials(username, password)
+    
+    OutputMessage Now() & " - Launching SAP login window..."
+    Call LaunchSapFile(username)
 
+    Dim loginWindowTimeoutMs
+    loginWindowTimeoutMs = 30000
+    OutputMessage Now() & " - Waiting " & loginWindowTimeoutMs & "ms for SAP login window..."
+    Call WaitForWindow(username, loginWindowTimeoutMs)
+
+    OutputMessage Now() & " - Starting credentials injection powershell..."
     Dim injectExec, injectPath
     Set injectExec = StartPowerShellFile(PS_Inject(username, username, password), injectPath)
     
-    'WScript.Echo Now() & "- Launching SAP login window..."
-    Call LaunchSapFile(username)
-
     Dim injectResult
     injectResult = FinishPowerShellFile(injectExec, injectPath)
     If InStr(injectResult, "OK") = 0 Then
-        WScript.Echo "SAP login injection returned: " & vbCrLf & injectResult
+        OutputMessage Now() & " - SAP login injection returned: " & vbCrLf & injectResult
         WScript.Quit
     End If
 
-    ' ---- Wait for Easy Access
-    Call WaitForWindow("SAP Easy Access", 12000)
-
+    Dim TimeoutMs : TimeoutMs = 20000
+    OutputMessage Now() & " - Waiting " & TimeoutMs & "ms for SAP Easy Access login window..."
+    Call WaitForWindow("SAP Easy Access", TimeoutMs)
+    
     ' ---- Attach to SAP session
     Set session = isLoggedIntoSAP()
     If session Is Nothing Then
-        WScript.Echo "SAP login failed - no session after login"
+        OutputMessage "SAP login failed - no session after login"
         WScript.Quit
     End If
-
+    
     session.FindById("wnd[0]").Maximize
     Set SAPLogin = session
-
+    
 End Function
+
+Sub OutputMessage(message)
+    If debugMode Then WScript.Echo message
+End Sub
 
 ' ============================================================================
 ' SAP SESSION DETECTION (unchanged, authoritative)
@@ -94,20 +115,20 @@ End Function
 Function isLoggedIntoSAP()
     On Error Resume Next
     Set isLoggedIntoSAP = Nothing
-
+    
     Dim SapGuiAuto, application, connection, session
     Set SapGuiAuto = GetObject("SAPGUI")
     If Err.Number <> 0 Then Exit Function
-
+    
     Set application = SapGuiAuto.GetScriptingEngine
     If application.Children.Count = 0 Then Exit Function
-
+    
     Set connection = application.Children(0)
     If connection.Children.Count = 0 Then Exit Function
-
+    
     Set session = connection.Children(0)
     Set isLoggedIntoSAP = session
-
+    
     On Error GoTo 0
 End Function
 
@@ -115,11 +136,11 @@ End Function
 ' CREDENTIAL HANDLING (PowerShell, single responsibility)
 ' ============================================================================
 Sub GetCredentials(ByRef username, ByRef password)
-
+    
     Dim output
     output = RunPowerShellFile(PS_ReadCred(target))
-    'WScript.Echo "Credential Manager output: " & vbCrLf & output
     If InStr(output, "|") > 0 Then
+        OutputMessage Now() & " - Saved credentials found."
         username = Split(output, "|")(0)
         'WScript.Echo Now() & "- username: " & username
         username = RemovePrefix(username)
@@ -127,21 +148,22 @@ Sub GetCredentials(ByRef username, ByRef password)
         password = Split(output, "|")(1)
         Exit Sub
     End If
-
+    OutputMessage Now() & " - No saved credentials found."
+    
     ' ---- No saved credential → ask for password
     username = CreateObject("WScript.Network").UserName
     password = RunPowerShell(PS_PromptPassword())
-
+    
     If Len(password) = 0 Then
-        WScript.Echo "No password entered."
+        OutputMessage "No password entered."
         WScript.Quit
     End If
-
+    
     ' ---- Save credential to credential manager for next time (PowerShell once)
     Dim writeCredResult
     writeCredResult = RunPowerShellFile(PS_WriteCred(target, username, password))
     If InStr(writeCredResult, "CredWrite failed") = 1 Then
-        WScript.Echo writeCredResult
+        OutputMessage writeCredResult
         WScript.Quit
     End If
 End Sub
@@ -162,7 +184,7 @@ End Function
 Sub LaunchSapFile(username)
     Dim sapPath, f
     sapPath = shell.ExpandEnvironmentStrings("%TEMP%") & "\sap_autologin.sap"
-
+    
     Set f = fso.CreateTextFile(sapPath, True)
     f.WriteLine "[System]"
     f.WriteLine "Name=PW1"
@@ -172,7 +194,7 @@ Sub LaunchSapFile(username)
     f.WriteLine "[Function]"
     f.WriteLine "Title=" & username
     f.Close
-
+    
     shell.Run """" & sapPath & """", 1, False
 End Sub
 
@@ -182,14 +204,14 @@ End Sub
 Sub WaitForWindow(title, timeoutMs)
     Dim i, ok
     ok = False
-
+    
     For i = 1 To (timeoutMs \ 100)
         ok = shell.AppActivate(title)
         If ok Then Exit Sub
         WScript.Sleep 100
     Next
-
-    WScript.Echo Now() & " - Timeout waiting for window: " & title
+    
+    OutputMessage Now() & " - Timeout waiting for window: " & title
     WScript.Quit
 End Sub
 
@@ -198,14 +220,14 @@ End Sub
 ' ============================================================================
 Function StartPowerShellFile(ByVal psCode, ByRef psPath)
     Dim tempFolder, file
-
+    
     Set tempFolder = fso.GetSpecialFolder(2)
     psPath = tempFolder & "\sap_inject_" & Replace(fso.GetTempName, ".tmp", ".ps1")
-
+    
     Set file = fso.CreateTextFile(psPath, True)
     file.Write psCode
     file.Close
-
+    
     Set StartPowerShellFile = shell.Exec( _
         "powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File """ & psPath & """")
 End Function
@@ -214,11 +236,11 @@ Function FinishPowerShellFile(exec, psPath)
     Dim output, stderr
     output = exec.StdOut.ReadAll
     stderr = exec.StdErr.ReadAll
-
+    
     On Error Resume Next
     fso.DeleteFile psPath
     On Error GoTo 0
-
+    
     If Len(stderr) > 0 Then output = output & vbCrLf & "POWERSHELL STDERR:" & vbCrLf & stderr
     FinishPowerShellFile = Trim(output)
 End Function
@@ -228,25 +250,25 @@ End Function
 ' ============================================================================
 Function RunPowerShell(cmd)
     Dim exec, stdout, stderr
-    
+
     Set exec = shell.Exec( _
         "powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -Command " & Chr(34) & cmd & Chr(34))
-    
+
     stdout = ""
     stderr = ""
-    
+
     Do While Not exec.StdOut.AtEndOfStream
         stdout = stdout & exec.StdOut.ReadLine & vbCrLf
     Loop
-    
+
     Do While Not exec.StdErr.AtEndOfStream
         stderr = stderr & exec.StdErr.ReadLine & vbCrLf
     Loop
-    
+
     If Len(stderr) > 0 Then
-        WScript.Echo "POWERSHELL STDERR:" & vbCrLf & stderr
+        OutputMessage "POWERSHELL STDERR:" & vbCrLf & stderr
     End If
-    
+
     RunPowerShell = Trim(stdout)
 End Function
 
@@ -256,22 +278,22 @@ End Function
 ' ============================================================================
 Function RunPowerShellFile(psCode)
     Dim tempFolder, psPath, file, exec, output
-
+    
     Set tempFolder = fso.GetSpecialFolder(2)
     psPath = tempFolder & "\sap_ps_" & Replace(Timer, ".", "") & ".ps1"
-
+    
     Set file = fso.CreateTextFile(psPath, True)
     file.Write psCode
     file.Close
-
+    
     Set exec = shell.Exec( _
         "powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File """ & psPath & """")
-
+    
     output = exec.StdOut.ReadAll
-
+    
     On Error Resume Next
     fso.DeleteFile psPath
-
+    
     RunPowerShellFile = Trim(output)
 End Function
 
@@ -279,9 +301,13 @@ End Function
 ' POWERSHELL CODE BUILDERS
 ' ============================================================================
 Function PS_ReadCred(target)
-
-    'works but lot of code - better version possible?
+    
     PS_ReadCred = _
+        "$assemblyPath = Join-Path $env:LOCALAPPDATA 'SAPLogin\CredMan.v1.dll'" & vbCrLf & _
+        "if (Test-Path $assemblyPath) {" & vbCrLf & _
+        "   Add-Type -Path $assemblyPath" & vbCrLf & _
+        "} else {" & vbCrLf & _
+        "   New-Item -ItemType Directory -Path (Split-Path $assemblyPath) -Force | Out-Null" & vbCrLf & _
         "Add-Type -TypeDefinition @'" & vbCrLf & _
         "using System;" & vbCrLf & _
         "using System.Runtime.InteropServices;" & vbCrLf & _
@@ -306,7 +332,9 @@ Function PS_ReadCred(target)
         "     public string UserName;" & vbCrLf & _
         " }" & vbCrLf & _
         "}" & vbCrLf & _
-        "'@;" & vbCrLf & _
+        "'@ -OutputAssembly $assemblyPath" & vbCrLf & _
+        "   Add-Type -Path $assemblyPath" & vbCrLf & _
+        "}" & vbCrLf & _
         "$ptr = [IntPtr]::Zero;" & vbCrLf & _
         "if ([CredMan]::CredRead('" & target & "', 1, 0, [ref]$ptr)) {" & vbCrLf & _
         "   $cred = [System.Runtime.InteropServices.Marshal]::PtrToStructure($ptr, [Type][CredMan+CREDENTIAL]);" & vbCrLf & _
@@ -317,7 +345,7 @@ Function PS_ReadCred(target)
         "} else {" & vbCrLf & _
         "   Write-Output 'Credential not found or access denied.'" & vbCrLf & _
         "}"
-
+    
     ' old way to output username and password separately, switched to single line with delimiter for easier parsing in VBScript
     '"   Write-Output ('Username: ' + $cred.UserName);" & vbCrLf & _
     '"   Write-Output ('Password: ' + $pass);" & vbCrLf & _
