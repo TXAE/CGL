@@ -70,17 +70,12 @@ Function SAPLogin()
     Dim username, password
     Call GetCredentials(username, password)
     
-    OutputMessage Now() & " - Launching SAP login window..."
-    Call LaunchSapFile(username)
-
-    Dim loginWindowTimeoutMs
-    loginWindowTimeoutMs = 30000
-    OutputMessage Now() & " - Waiting " & loginWindowTimeoutMs & "ms for SAP login window..."
-    Call WaitForWindow(username, loginWindowTimeoutMs)
-
     OutputMessage Now() & " - Starting credentials injection powershell..."
     Dim injectExec, injectPath
     Set injectExec = StartPowerShellFile(PS_Inject(username, username, password), injectPath)
+
+    OutputMessage Now() & " - Launching SAP login window..."
+    Call LaunchSapFile(username)
     
     Dim injectResult
     injectResult = FinishPowerShellFile(injectExec, injectPath)
@@ -438,6 +433,11 @@ End Function
 
 Function PS_Inject(title, u, p)
     PS_Inject = _
+        "$assemblyPath = Join-Path $env:LOCALAPPDATA 'SAPLogin\WindowApi.v1.dll'" & vbCrLf & _
+        "if (Test-Path $assemblyPath) {" & vbCrLf & _
+        "   Add-Type -Path $assemblyPath" & vbCrLf & _
+        "} else {" & vbCrLf & _
+        "   New-Item -ItemType Directory -Path (Split-Path $assemblyPath) -Force | Out-Null" & vbCrLf & _
         "Add-Type -TypeDefinition @'" & vbCrLf & _
         "using System;" & vbCrLf & _
         "using System.Text;" & vbCrLf & _
@@ -470,14 +470,16 @@ Function PS_Inject(title, u, p)
         "     return foundWindow;" & vbCrLf & _
         " }" & vbCrLf & _
         "}" & vbCrLf & _
-        "'@;" & vbCrLf & _
+        "'@ -OutputAssembly $assemblyPath" & vbCrLf & _
+        "   Add-Type -Path $assemblyPath" & vbCrLf & _
+        "}" & vbCrLf & _
         "$WM_SETTEXT = 0x000C; $WM_KEYDOWN = 0x0100; $WM_KEYUP = 0x0101; $VK_RETURN = 0x0D;" & vbCrLf & _
         "$title = '" & Replace(title, "'", "''") & "';" & vbCrLf & _
         "$user = '" & Replace(u, "'", "''") & "';" & vbCrLf & _
         "$pw = '" & Replace(p, "'", "''") & "';" & vbCrLf & _
         "$timer = [Diagnostics.Stopwatch]::StartNew();" & vbCrLf & _
         "$hWnd = [IntPtr]::Zero;" & vbCrLf & _
-        "while ($hWnd -eq [IntPtr]::Zero -and $timer.ElapsedMilliseconds -lt 10000) {" & vbCrLf & _
+        "while ($hWnd -eq [IntPtr]::Zero -and $timer.ElapsedMilliseconds -lt 30000) {" & vbCrLf & _
         "    $hWnd = [W]::FindWindowByText($title);" & vbCrLf & _
         "    if ($hWnd -eq [IntPtr]::Zero) { Start-Sleep -Milliseconds 25 }" & vbCrLf & _
         "}" & vbCrLf & _
