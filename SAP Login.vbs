@@ -27,7 +27,7 @@ Set shell = CreateObject("WScript.Shell")
 Set fso = CreateObject("Scripting.FileSystemObject")
 
 Dim debugMode
-debugMode = True
+debugMode = False
 
 Dim target
 target = "TERMSRV/ceberr55mp.eu.corp.cargill.com"
